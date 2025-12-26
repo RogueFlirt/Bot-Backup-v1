@@ -1,0 +1,77 @@
+<%- include('partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">📜</span>
+        Transcript - <%= transcript.ticket_id %>
+    </h1>
+    <div class="page-actions">
+        <a href="javascript:history.back()" class="btn btn-secondary">← Back</a>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <span class="card-title">Ticket Information</span>
+    </div>
+    <div style="padding: 1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div>
+            <strong style="color: var(--text-muted);">Ticket ID</strong>
+            <p class="font-mono"><%= transcript.ticket_id %></p>
+        </div>
+        <div>
+            <strong style="color: var(--text-muted);">User</strong>
+            <p><%= transcript.username || transcript.user_id || '-' %></p>
+        </div>
+        <div>
+            <strong style="color: var(--text-muted);">Game</strong>
+            <p><%= transcript.game_name || '-' %></p>
+        </div>
+        <div>
+            <strong style="color: var(--text-muted);">Created</strong>
+            <p><%= transcript.created_at ? new Date(transcript.created_at).toLocaleString() : '-' %></p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Messages (<%= messages.length %>)</span>
+    </div>
+    
+    <% if (messages && messages.length > 0) { %>
+    <div style="padding: 1rem; max-height: 600px; overflow-y: auto;">
+        <% messages.forEach((msg, index) => { %>
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 8px; border-left: 3px solid <%= msg.bot ? '#5865F2' : '#23a559' %>;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <strong style="color: <%= msg.bot ? '#5865F2' : '#fff' %>;">
+                    <%= msg.bot ? '🤖 Bot' : '👤 ' + (msg.author || msg.username || 'User') %>
+                </strong>
+                <span style="color: var(--text-muted); font-size: 0.85rem;">
+                    <%= msg.timestamp ? new Date(msg.timestamp).toLocaleString() : '' %>
+                </span>
+            </div>
+            <div style="color: var(--text-secondary); white-space: pre-wrap; word-break: break-word;">
+                <%= msg.content || msg.message || '' %>
+            </div>
+            <% if (msg.attachments && msg.attachments.length > 0) { %>
+            <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                <% msg.attachments.forEach(att => { %>
+                <a href="<%= att.url || att %>" target="_blank" class="btn btn-sm btn-secondary">
+                    📎 <%= att.name || 'Attachment' %>
+                </a>
+                <% }); %>
+            </div>
+            <% } %>
+        </div>
+        <% }); %>
+    </div>
+    <% } else { %>
+    <div class="empty-state">
+        <div class="icon">📭</div>
+        <p>No messages in this transcript.</p>
+    </div>
+    <% } %>
+</div>
+
+<%- include('partials/footer') %>

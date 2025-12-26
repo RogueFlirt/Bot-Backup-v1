@@ -1,0 +1,74 @@
+<%- include('_layout-start') %>
+
+<div class="content-header">
+    <h2>🔴 EA Queue</h2>
+    <span class="badge badge-ea">Pending Tickets</span>
+</div>
+
+<div class="content-body">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value"><%= tickets.length %></div>
+            <div class="stat-label">Pending Tickets</div>
+        </div>
+        <% accounts.forEach(a => { %>
+        <div class="stat-card">
+            <div class="stat-value"><%= tickets.filter(t => t.ea_account === a.account_name).length %></div>
+            <div class="stat-label"><%= a.account_name %></div>
+        </div>
+        <% }) %>
+    </div>
+
+    <div class="card">
+        <div class="card-title">📋 Pending EA Tickets</div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Ticket ID</th>
+                        <th>User</th>
+                        <th>Game</th>
+                        <th>Account</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (tickets.length === 0) { %>
+                    <tr><td colspan="7" style="text-align:center; color:#888;">No pending tickets</td></tr>
+                    <% } %>
+                    <% tickets.forEach(t => { %>
+                    <tr>
+                        <td><code><%= t.ticket_id %></code></td>
+                        <td><%= t.user_id %></td>
+                        <td><%= t.game_name %></td>
+                        <td><span class="badge badge-ea"><%= t.ea_account || 'unassigned' %></span></td>
+                        <td><span class="badge badge-<%= t.status %>"><%= t.status %></span></td>
+                        <td><%= new Date(t.created_at).toLocaleString() %></td>
+                        <td>
+                            <a href="/dashboard/tickets/<%= t.id %>" class="btn btn-sm btn-secondary">View</a>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">ℹ️ EA Token Generation Info</div>
+        <p style="color: #888; line-height: 1.6;">
+            EA tokens are generated on-demand via the automated worker process. When a user requests an EA game:
+        </p>
+        <ol style="color: #888; margin-top: 10px; padding-left: 20px; line-height: 1.8;">
+            <li>Ticket is created with "pending" status</li>
+            <li>EA Worker picks up the ticket</li>
+            <li>TCNO account switcher activates the correct EA account</li>
+            <li>Token generator automation runs</li>
+            <li>Token is delivered to the user via Discord DM</li>
+        </ol>
+    </div>
+</div>
+
+<%- include('_layout-end') %>

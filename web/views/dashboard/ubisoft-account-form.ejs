@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <link rel="stylesheet" href="/dashboard/static/css/dashboard.css">
+    <style>
+        .nav-section-title {
+            padding: 8px 16px;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .form-container {
+            max-width: 500px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        .form-group small {
+            color: var(--text-muted);
+            display: block;
+            margin-top: 4px;
+        }
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+        .danger-zone {
+            margin-top: 40px;
+            padding: 20px;
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid var(--accent-danger);
+            border-radius: 8px;
+        }
+        .danger-zone h4 {
+            color: var(--accent-danger);
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo">🍺</span>
+                <h1>Pub's Lounge</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/games" class="nav-item"><span class="nav-icon">🎮</span><span>Games</span></a>
+                <a href="/dashboard/accounts" class="nav-item"><span class="nav-icon">👤</span><span>Accounts</span></a>
+                <a href="/dashboard/tokens" class="nav-item"><span class="nav-icon">🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/transcripts" class="nav-item"><span class="nav-icon">📜</span><span>Transcripts</span></a>
+                <div class="nav-divider"></div>
+                <div class="nav-section-title">🎯 Ubisoft</div>
+                <a href="/dashboard/ubisoft-games" class="nav-item"><span class="nav-icon">🎮</span><span>Ubisoft Games</span></a>
+                <a href="/dashboard/ubisoft-accounts" class="nav-item active"><span class="nav-icon">👤</span><span>Ubisoft Accounts</span></a>
+                <a href="/dashboard/ubisoft-tokens" class="nav-item"><span class="nav-icon">🎫</span><span>Ubisoft Tokens</span></a>
+                <a href="/dashboard/ubisoft-activations" class="nav-item"><span class="nav-icon">✅</span><span>Ubisoft Activations</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item"><span class="nav-icon">📈</span><span>Analytics</span></a>
+                <a href="/dashboard/activations" class="nav-item"><span class="nav-icon">✅</span><span>Activated Users</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="" class="user-avatar" onerror="this.style.display='none'">
+                    <div class="user-details">
+                        <span class="user-name"><%= user.username %></span>
+                        <span class="user-role">Staff</span>
+                    </div>
+                </div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h2>🎯 <%= title %></h2>
+                <a href="/dashboard/ubisoft-accounts" class="btn btn-secondary">← Back to List</a>
+            </header>
+            
+            <div class="content-body">
+                <div class="form-container">
+                    <form method="POST" action="<%= action %>">
+                        <div class="form-group">
+                            <label for="account_name">Account Name *</label>
+                            <input type="text" id="account_name" name="account_name" value="<%= account ? account.account_name : '' %>" required placeholder="e.g., ubi_main_1">
+                            <small>A friendly name to identify this account</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">Email *</label>
+                            <input type="email" id="email" name="email" value="<%= account ? account.email : '' %>" required placeholder="account@email.com">
+                            <small>Ubisoft account login email</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="password">Password <%= account ? '' : '*' %></label>
+                            <input type="password" id="password" name="password" <%= account ? '' : 'required' %> placeholder="<%= account ? 'Leave blank to keep current' : 'Account password' %>">
+                            <% if (account) { %>
+                            <small>Leave blank to keep the current password</small>
+                            <% } else { %>
+                            <small>Ubisoft account password</small>
+                            <% } %>
+                        </div>
+                        
+                        <% if (account) { %>
+                        <div class="form-group">
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="enabled" name="enabled" <%= account.enabled ? 'checked' : '' %>>
+                                <label for="enabled" style="margin-bottom: 0;">Enabled</label>
+                            </div>
+                            <small>Disabled accounts won't be used for token generation</small>
+                        </div>
+                        <% } %>
+                        
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary"><%= account ? 'Update Account' : 'Add Account' %></button>
+                            <a href="/dashboard/ubisoft-accounts" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                    
+                    <% if (account) { %>
+                    <div class="danger-zone">
+                        <h4>⚠️ Danger Zone</h4>
+                        <p>Deleting this account will also remove all associated tokens.</p>
+                        <form method="POST" action="/dashboard/ubisoft-accounts/<%= account.id %>/delete" onsubmit="return confirm('Are you sure you want to delete this account? This will also delete all associated tokens!')">
+                            <button type="submit" class="btn btn-danger">Delete Account</button>
+                        </form>
+                    </div>
+                    <% } %>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

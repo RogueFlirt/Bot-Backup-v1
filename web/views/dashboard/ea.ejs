@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <link rel="stylesheet" href="/dashboard/static/css/dashboard.css">
+    <style>
+        .nav-section-title { padding: 12px 20px 6px; font-size: 11px; text-transform: uppercase; color: #666; font-weight: 600; letter-spacing: 0.5px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stat-card { background: linear-gradient(135deg, #16213e 0%, #0f3460 100%); border: 1px solid #0f3460; border-radius: 10px; padding: 20px; text-align: center; }
+        .stat-value { font-size: 2rem; font-weight: bold; color: #e94560; }
+        .stat-label { color: #888; font-size: 0.9rem; margin-top: 5px; }
+        .card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .card-title { font-size: 1.2rem; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: #888; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #0f3460; border-radius: 5px; background: #1a1a2e; color: #fff; box-sizing: border-box; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 12px; text-align: left; border-bottom: 1px solid #0f3460; }
+        .table th { background: #0f3460; font-weight: 600; }
+        .table tr:hover { background: rgba(233, 69, 96, 0.1); }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-mitch { background: #3498db; color: #fff; }
+        .badge-azam { background: #9b59b6; color: #fff; }
+        .badge-success { background: #28a745; color: #fff; }
+        .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9rem; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #e94560; color: #fff; }
+        .btn-primary:hover { background: #ff6b6b; }
+        .btn-secondary { background: #0f3460; color: #fff; }
+        .btn-danger { background: #dc3545; color: #fff; }
+        .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+        .account-section { margin-bottom: 30px; }
+        .account-header { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #0f3460; }
+        .actions { display: flex; gap: 5px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: #16213e; border-radius: 10px; padding: 30px; width: 90%; max-width: 500px; border: 1px solid #0f3460; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-close { background: none; border: none; color: #888; font-size: 1.5rem; cursor: pointer; }
+        .empty-state { text-align: center; padding: 40px; color: #666; }
+        .toggle-switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: 0.4s; border-radius: 24px; }
+        .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: 0.4s; border-radius: 50%; }
+        input:checked + .toggle-slider { background-color: #28a745; }
+        input:checked + .toggle-slider:before { transform: translateX(26px); }
+        .queue-game { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1a1a2e; }
+        .queue-game:last-child { border-bottom: none; }
+        .cooldown-badge { background: #ffc107; color: #000; padding: 2px 6px; border-radius: 3px; font-size: 0.7rem; margin-left: 10px; }
+        .success-banner { background: rgba(40, 167, 69, 0.2); border: 1px solid #28a745; color: #28a745; padding: 12px; border-radius: 6px; margin-bottom: 15px; }
+        .nav-tabs { display: flex; gap: 5px; margin-bottom: 20px; background: #0f3460; padding: 5px; border-radius: 8px; }
+        .nav-tab { padding: 10px 20px; border-radius: 5px; text-decoration: none; color: #888; }
+        .nav-tab:hover, .nav-tab.active { background: #e94560; color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo">🍺</span>
+                <h1>Pub's Lounge</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/games" class="nav-item"><span class="nav-icon">🎮</span><span>Games</span></a>
+                <a href="/dashboard/accounts" class="nav-item"><span class="nav-icon">👤</span><span>Accounts</span></a>
+                <a href="/dashboard/tokens" class="nav-item"><span class="nav-icon">🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/transcripts" class="nav-item"><span class="nav-icon">📜</span><span>Transcripts</span></a>
+                <div class="nav-divider"></div>
+                <div class="nav-section-title">🔴 EA</div>
+                <a href="/dashboard/ea" class="nav-item active"><span class="nav-icon">🎮</span><span>EA Games</span></a>
+                <a href="/dashboard/ea/tickets" class="nav-item"><span class="nav-icon">🎫</span><span>EA Tickets</span></a>
+                <a href="/dashboard/ea/cooldowns" class="nav-item"><span class="nav-icon">⏱️</span><span>EA Cooldowns</span></a>
+                <a href="/dashboard/ea/transcripts" class="nav-item"><span class="nav-icon">📜</span><span>EA Transcripts</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item"><span class="nav-icon">📈</span><span>Analytics</span></a>
+                <a href="/dashboard/activations" class="nav-item"><span class="nav-icon">✅</span><span>Activations</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/generate" class="nav-item"><span class="nav-icon">⚡</span><span>Generate Token</span></a>
+                <a href="/dashboard/audit-logs" class="nav-item"><span class="nav-icon">📋</span><span>Audit Logs</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="" class="user-avatar" onerror="this.style.display='none'">
+                    <div class="user-details">
+                        <span class="user-name"><%= user.username %></span>
+                        <span class="user-role">Staff</span>
+                    </div>
+                </div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h2>🔴 EA Games</h2>
+                <button class="btn btn-primary" onclick="openAddModal()">+ Add Game</button>
+            </header>
+            
+            <div class="content-body">
+                <script>
+                    const params = new URLSearchParams(window.location.search);
+                    const success = params.get('success');
+                    if (success) {
+                        const msgs = { 'added': '✅ Game added!', 'updated': '✅ Game updated!', 'deleted': '✅ Game deleted!' };
+                        if (msgs[success]) document.write('<div class="success-banner">' + msgs[success] + '</div>');
+                        window.history.replaceState({}, '', window.location.pathname);
+                    }
+                </script>
+                
+                <div class="nav-tabs">
+                    <a href="/dashboard/ea" class="nav-tab active">Games</a>
+                    <a href="/dashboard/ea/tickets" class="nav-tab">Tickets</a>
+                    <a href="/dashboard/ea/cooldowns" class="nav-tab">Cooldowns</a>
+                    <a href="/dashboard/ea/transcripts" class="nav-tab">Transcripts</a>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card"><div class="stat-value"><%= stats.totalGames %></div><div class="stat-label">Total Games</div></div>
+                    <div class="stat-card"><div class="stat-value"><%= stats.totalGenerated %></div><div class="stat-label">Tokens Generated</div></div>
+                    <div class="stat-card"><div class="stat-value"><%= stats.pendingTickets %></div><div class="stat-label">Pending Tickets</div></div>
+                    <div class="stat-card"><div class="stat-value"><%= accounts.length %></div><div class="stat-label">EA Accounts</div></div>
+                </div>
+                
+                <% if (pendingByGame && pendingByGame.length > 0) { %>
+                <div class="card">
+                    <div class="card-title">Queue Status</div>
+                    <% for (const q of pendingByGame) { %>
+                        <div class="queue-game">
+                            <span><%= q.game_name || 'Unknown' %><% if (q.onCooldown) { %><span class="cooldown-badge">⏳ COOLDOWN</span><% } %></span>
+                            <span><%= q.pending_count %> pending</span>
+                        </div>
+                    <% } %>
+                </div>
+                <% } %>
+                
+                <% for (const accountName of accounts) { %>
+                    <div class="account-section">
+                        <div class="account-header">
+                            <span class="badge badge-<%= accountName %>"><%= accountName.toUpperCase() %></span>
+                            <h3>Account: <%= accountName %></h3>
+                            <span style="color: #666; margin-left: auto;"><%= (gamesByAccount[accountName] || []).length %> games</span>
+                        </div>
+                        <% if (gamesByAccount[accountName] && gamesByAccount[accountName].length > 0) { %>
+                            <div class="card">
+                                <table class="table">
+                                    <thead><tr><th>Game Name</th><th>Content ID</th><th>On Panel</th><th>Enabled</th><th>Actions</th></tr></thead>
+                                    <tbody>
+                                        <% for (const game of gamesByAccount[accountName]) { %>
+                                            <tr>
+                                                <td><%= game.game_name %></td>
+                                                <td><code style="font-size: 0.8rem;"><%= game.content_id || '-' %></code></td>
+                                                <td><% if (game.show_on_panel) { %><span class="badge badge-success">Yes</span><% } else { %><span style="color:#666">No</span><% } %></td>
+                                                <td><label class="toggle-switch"><input type="checkbox" <%= game.enabled ? 'checked' : '' %> onchange="toggleGame(<%= game.id %>)"><span class="toggle-slider"></span></label></td>
+                                                <td class="actions">
+                                                    <button class="btn btn-secondary btn-sm" onclick='openEditModal(<%= JSON.stringify(game) %>)'>Edit</button>
+                                                    <form action="/dashboard/ea/games/<%= game.id %>/delete" method="POST" style="display:inline" onsubmit="return confirm('Delete?')"><button type="submit" class="btn btn-danger btn-sm">Delete</button></form>
+                                                </td>
+                                            </tr>
+                                        <% } %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <% } else { %>
+                            <div class="card"><div class="empty-state">No games for this account yet.</div></div>
+                        <% } %>
+                    </div>
+                <% } %>
+            </div>
+        </main>
+    </div>
+    
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Add EA Game</h2><button class="modal-close" onclick="closeModal('addModal')">&times;</button></div>
+            <form action="/dashboard/ea/games/add" method="POST">
+                <div class="form-group"><label>Game Name</label><input type="text" name="game_name" class="form-control" required placeholder="e.g., F1 25"></div>
+                <div class="form-group"><label>Content ID (Optional)</label><input type="text" name="content_id" class="form-control"></div>
+                <div class="form-group"><label>Account</label><select name="account_name" class="form-control" required><% for (const acc of accounts) { %><option value="<%= acc %>"><%= acc %></option><% } %></select></div>
+                <button type="submit" class="btn btn-primary">Add Game</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header"><h2>Edit EA Game</h2><button class="modal-close" onclick="closeModal('editModal')">&times;</button></div>
+            <form id="editForm" method="POST">
+                <div class="form-group"><label>Game Name</label><input type="text" name="game_name" id="edit_game_name" class="form-control" required></div>
+                <div class="form-group"><label>Content ID</label><input type="text" name="content_id" id="edit_content_id" class="form-control"></div>
+                <div class="form-group"><label>Account</label><select name="account_name" id="edit_account_name" class="form-control" required><% for (const acc of accounts) { %><option value="<%= acc %>"><%= acc %></option><% } %></select></div>
+                <div class="form-group"><label><input type="checkbox" name="show_on_panel" id="edit_show_on_panel" value="1"> Show on Panel</label></div>
+                <div class="form-group"><label><input type="checkbox" name="enabled" id="edit_enabled" value="1"> Enabled</label></div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        function openAddModal() { document.getElementById('addModal').classList.add('active'); }
+        function openEditModal(game) {
+            document.getElementById('editForm').action = '/dashboard/ea/games/' + game.id + '/edit';
+            document.getElementById('edit_game_name').value = game.game_name;
+            document.getElementById('edit_content_id').value = game.content_id || '';
+            document.getElementById('edit_account_name').value = game.account_name;
+            document.getElementById('edit_show_on_panel').checked = game.show_on_panel == 1;
+            document.getElementById('edit_enabled').checked = game.enabled == 1;
+            document.getElementById('editModal').classList.add('active');
+        }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        function toggleGame(id) { fetch('/dashboard/ea/games/' + id + '/toggle', { method: 'POST' }).then(r => r.json()).then(d => { if (!d.success) location.reload(); }); }
+        document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
+    </script>
+</body>
+</html>

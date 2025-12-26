@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
+        .dashboard-container { display: flex; min-height: 100vh; }
+        .sidebar { width: 260px; background: linear-gradient(180deg, #12121a 0%, #0d0d14 100%); border-right: 1px solid #1a1a2e; position: fixed; height: 100vh; overflow-y: auto; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #1a1a2e; display: flex; align-items: center; gap: 12px; }
+        .sidebar-header .logo { font-size: 2rem; }
+        .sidebar-header h1 { font-size: 1.1rem; color: #e94560; }
+        .sidebar-nav { padding: 15px 0; }
+        .nav-section { padding: 8px 20px; font-size: 11px; text-transform: uppercase; color: #666; font-weight: 600; margin-top: 10px; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #888; text-decoration: none; border-left: 3px solid transparent; }
+        .nav-item:hover { background: rgba(233, 69, 96, 0.1); color: #fff; }
+        .nav-item.active { background: rgba(233, 69, 96, 0.15); color: #e94560; border-left-color: #e94560; }
+        .nav-divider { height: 1px; background: #1a1a2e; margin: 10px 20px; }
+        .sidebar-footer { padding: 15px 20px; border-top: 1px solid #1a1a2e; position: absolute; bottom: 0; width: 100%; background: #0d0d14; }
+        .logout-btn { display: block; text-align: center; padding: 8px; background: rgba(220, 53, 69, 0.2); color: #dc3545; text-decoration: none; border-radius: 5px; margin-top: 10px; }
+        .main-content { flex: 1; margin-left: 260px; }
+        .content-header { padding: 20px 30px; background: #12121a; border-bottom: 1px solid #1a1a2e; display: flex; justify-content: space-between; align-items: center; }
+        .content-body { padding: 25px 30px; }
+        .card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .card-title { font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #0f3460; display: flex; justify-content: space-between; align-items: center; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #0f3460; }
+        .table th { background: #0f3460; font-weight: 600; font-size: 0.85rem; }
+        .table tr:hover { background: rgba(233, 69, 96, 0.05); }
+        .btn { padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 5px; }
+        .btn-primary { background: #e94560; color: #fff; }
+        .btn-secondary { background: #0f3460; color: #fff; }
+        .btn-danger { background: #dc3545; color: #fff; }
+        .btn-success { background: #28a745; color: #fff; }
+        .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
+        .badge { padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-high { background: #dc3545; color: #fff; }
+        .badge-normal { background: #28a745; color: #fff; }
+        .badge-success { background: #28a745; color: #fff; }
+        .badge-warning { background: #ffc107; color: #000; }
+        .stats-row { display: flex; gap: 15px; margin-bottom: 20px; }
+        .stat-box { background: #0f3460; padding: 15px 25px; border-radius: 8px; text-align: center; }
+        .stat-box .value { font-size: 1.5rem; font-weight: bold; color: #e94560; }
+        .stat-box .label { font-size: 0.8rem; color: #888; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 6px; color: #888; font-size: 0.9rem; }
+        .form-control { width: 100%; padding: 10px 12px; border: 1px solid #0f3460; border-radius: 6px; background: #1a1a2e; color: #fff; }
+        .form-control:focus { outline: none; border-color: #e94560; }
+        .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 25px; width: 90%; max-width: 500px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #0f3460; }
+        .modal-close { background: none; border: none; color: #888; font-size: 1.5rem; cursor: pointer; }
+        .actions { display: flex; gap: 5px; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header"><span class="logo">🍺</span><h1>Pub's Lounge</h1></div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span>📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/tickets" class="nav-item"><span>🎫</span><span>Live Tickets</span></a>
+                <div class="nav-section">🎮 Steam</div>
+                <a href="/dashboard/steam/games" class="nav-item active"><span>🎮</span><span>Games</span></a>
+                <a href="/dashboard/steam/accounts" class="nav-item"><span>👤</span><span>Accounts</span></a>
+                <a href="/dashboard/steam/tokens" class="nav-item"><span>🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/steam/transcripts" class="nav-item"><span>📜</span><span>Transcripts</span></a>
+                <a href="/dashboard/steam/activations" class="nav-item"><span>✅</span><span>Activations</span></a>
+                <a href="/dashboard/steam/generate" class="nav-item"><span>⚡</span><span>Generate</span></a>
+                <div class="nav-section">🎯 Ubisoft</div>
+                <a href="/dashboard/ubisoft/games" class="nav-item"><span>🎮</span><span>Games</span></a>
+                <a href="/dashboard/ubisoft/accounts" class="nav-item"><span>👤</span><span>Accounts</span></a>
+                <a href="/dashboard/ubisoft/tokens" class="nav-item"><span>🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/ubisoft/transcripts" class="nav-item"><span>📜</span><span>Transcripts</span></a>
+                <a href="/dashboard/ubisoft/activations" class="nav-item"><span>✅</span><span>Activations</span></a>
+                <a href="/dashboard/ubisoft/generate" class="nav-item"><span>⚡</span><span>Generate</span></a>
+                <div class="nav-section">🔴 EA</div>
+                <a href="/dashboard/ea/games" class="nav-item"><span>🎮</span><span>Games</span></a>
+                <a href="/dashboard/ea/accounts" class="nav-item"><span>👤</span><span>Accounts</span></a>
+                <a href="/dashboard/ea/transcripts" class="nav-item"><span>📜</span><span>Transcripts</span></a>
+                <a href="/dashboard/ea/activations" class="nav-item"><span>✅</span><span>Activations</span></a>
+                <a href="/dashboard/ea/generate" class="nav-item"><span>⚡</span><span>Queue</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item"><span>📈</span><span>Analytics</span></a>
+                <a href="/dashboard/cooldowns" class="nav-item"><span>⏱️</span><span>Cooldowns</span></a>
+                <a href="/dashboard/macros" class="nav-item"><span>📝</span><span>Macros</span></a>
+                <a href="/dashboard/users" class="nav-item"><span>👤</span><span>Users</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer">
+                <div><%= user.username %> (<%= user.role %>)</div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h2>🎮 Steam Games</h2>
+                <button class="btn btn-primary" onclick="openAddModal()">+ Add Game</button>
+            </header>
+            
+            <div class="content-body">
+                <div class="stats-row">
+                    <div class="stat-box"><div class="value"><%= games.length %></div><div class="label">Total Games</div></div>
+                    <div class="stat-box"><div class="value"><%= games.reduce((a, g) => a + (g.stats?.available || 0), 0) %></div><div class="label">Available Tokens</div></div>
+                    <div class="stat-box"><div class="value"><%= games.filter(g => g.demand_type === 'high').length %></div><div class="label">High Demand</div></div>
+                </div>
+                
+                <div class="card">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Game Name</th>
+                                <th>Game ID</th>
+                                <th>Tokens</th>
+                                <th>Demand</th>
+                                <th>Size</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% games.forEach(game => { %>
+                            <tr>
+                                <td><strong><%= game.game_name %></strong></td>
+                                <td><code><%= game.game_id %></code></td>
+                                <td>
+                                    <span class="badge badge-success"><%= game.stats?.available || 0 %> avail</span>
+                                    <span class="badge badge-warning"><%= game.stats?.used || 0 %> used</span>
+                                </td>
+                                <td><span class="badge badge-<%= game.demand_type === 'high' ? 'high' : 'normal' %>"><%= game.demand_type %></span></td>
+                                <td><%= game.size_gb || 0 %> GB</td>
+                                <td class="actions">
+                                    <a href="/dashboard/steam/games/<%= game.id %>/edit" class="btn btn-sm btn-secondary">Edit</a>
+                                    <form method="POST" action="/dashboard/steam/games/<%= game.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this game?')">
+                                        <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Add Game Modal -->
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Steam Game</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <form method="POST" action="/dashboard/steam/games/add">
+                <div class="form-group">
+                    <label>Game ID (slug)</label>
+                    <input type="text" name="game_id" class="form-control" required placeholder="e.g. game_name_edition">
+                </div>
+                <div class="form-group">
+                    <label>Game Name</label>
+                    <input type="text" name="game_name" class="form-control" required placeholder="e.g. Game Name: Special Edition">
+                </div>
+                <div class="form-group">
+                    <label>Folder Name</label>
+                    <input type="text" name="folder_name" class="form-control" placeholder="Optional - defaults to game name">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Size (GB)</label>
+                        <input type="number" name="size_gb" class="form-control" step="0.1" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Demand Type</label>
+                        <select name="demand_type" class="form-control">
+                            <option value="normal">Normal</option>
+                            <option value="high">High Demand</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%">Add Game</button>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        function openAddModal() { document.getElementById('addModal').classList.add('active'); }
+        function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('active')); }
+        document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) closeModal(); }));
+    </script>
+</body>
+</html>

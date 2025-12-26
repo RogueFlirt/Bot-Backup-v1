@@ -1,0 +1,121 @@
+<%- include('_layout-start') %>
+
+<div class="content-header">
+    <h2>👤 User History</h2>
+    <code style="background: #0f3460; padding: 8px 12px; border-radius: 4px;"><%= userId %></code>
+</div>
+
+<div class="content-body">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value"><%= history?.tickets?.length || 0 %></div>
+            <div class="stat-label">Total Tickets</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value"><%= history?.activations?.length || 0 %></div>
+            <div class="stat-label">Total Activations</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value"><%= history?.cooldowns?.length || 0 %></div>
+            <div class="stat-label">Active Cooldowns</div>
+        </div>
+    </div>
+
+    <!-- Tickets -->
+    <div class="card">
+        <div class="card-title">🎫 Tickets</div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Ticket ID</th>
+                        <th>Platform</th>
+                        <th>Game</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (!history?.tickets || history.tickets.length === 0) { %>
+                    <tr><td colspan="6" style="text-align:center; color:#888;">No tickets</td></tr>
+                    <% } %>
+                    <% (history?.tickets || []).forEach(t => { %>
+                    <tr>
+                        <td><code><%= t.ticket_id %></code></td>
+                        <td><span class="badge badge-<%= t.platform %>"><%= t.platform %></span></td>
+                        <td><%= t.game_name || t.game_id %></td>
+                        <td><span class="badge badge-<%= t.status %>"><%= t.status %></span></td>
+                        <td><%= new Date(t.created_at).toLocaleString() %></td>
+                        <td><a href="/dashboard/tickets/<%= t.id %>" class="btn btn-sm btn-secondary">View</a></td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Activations -->
+    <div class="card">
+        <div class="card-title">✅ Activations</div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Platform</th>
+                        <th>Game</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (!history?.activations || history.activations.length === 0) { %>
+                    <tr><td colspan="3" style="text-align:center; color:#888;">No activations</td></tr>
+                    <% } %>
+                    <% (history?.activations || []).forEach(a => { %>
+                    <tr>
+                        <td><span class="badge badge-<%= a.platform %>"><%= a.platform %></span></td>
+                        <td><%= a.game_name || a.game_id %></td>
+                        <td><%= new Date(a.created_at).toLocaleString() %></td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Cooldowns -->
+    <div class="card">
+        <div class="card-title">⏰ Active Cooldowns</div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Platform</th>
+                        <th>Reason</th>
+                        <th>Expires</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (!history?.cooldowns || history.cooldowns.length === 0) { %>
+                    <tr><td colspan="4" style="text-align:center; color:#888;">No active cooldowns</td></tr>
+                    <% } %>
+                    <% (history?.cooldowns || []).forEach(c => { %>
+                    <tr>
+                        <td><span class="badge badge-<%= c.platform === 'all' ? 'closed' : c.platform %>"><%= c.platform %></span></td>
+                        <td><%= c.reason || '-' %></td>
+                        <td><%= new Date(c.expires_at).toLocaleString() %></td>
+                        <td>
+                            <form method="POST" action="/dashboard/cooldowns/<%= c.id %>/remove" style="display:inline">
+                                <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<%- include('_layout-end') %>

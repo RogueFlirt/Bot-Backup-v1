@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <link rel="stylesheet" href="/dashboard/static/css/dashboard.css">
+    <style>
+        .form-inline-flex {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .form-inline-flex .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .key-code {
+            font-size: 11px;
+            word-break: break-all;
+            font-family: monospace;
+            background: #1a1a2e;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .file-preview {
+            margin-top: 5px;
+        }
+        .file-preview pre {
+            background: #1a1a2e;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow: auto;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+        .card-danger {
+            border-color: #dc3545;
+        }
+        .card-danger .card-header {
+            background: rgba(220, 53, 69, 0.2);
+        }
+        .back-btn {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo">🍺</span>
+                <h1>Pub's Lounge</h1>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/dashboard/games" class="nav-item">
+                    <span class="nav-icon">🎮</span>
+                    <span>Games</span>
+                </a>
+                <a href="/dashboard/accounts" class="nav-item">
+                    <span class="nav-icon">👤</span>
+                    <span>Accounts</span>
+                </a>
+                <a href="/dashboard/tokens" class="nav-item">
+                    <span class="nav-icon">🎫</span>
+                    <span>Tokens</span>
+                </a>
+                <a href="/dashboard/transcripts" class="nav-item">
+                    <span class="nav-icon">📜</span>
+                    <span>Transcripts</span>
+                </a>
+                
+                <div class="nav-divider"></div>
+                <div class="nav-section-title" style="padding: 8px 16px; font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px;">🎯 Ubisoft</div>
+                <a href="/dashboard/ubisoft-games" class="nav-item">
+                    <span class="nav-icon">🎮</span>
+                    <span>Ubisoft Games</span>
+                </a>
+                <a href="/dashboard/ubisoft-accounts" class="nav-item">
+                    <span class="nav-icon">👤</span>
+                    <span>Ubisoft Accounts</span>
+                </a>
+                <a href="/dashboard/ubisoft-tokens" class="nav-item">
+                    <span class="nav-icon">🎫</span>
+                    <span>Ubisoft Tokens</span>
+                </a>
+                <a href="/dashboard/ubisoft-activations" class="nav-item">
+                    <span class="nav-icon">✅</span>
+                    <span>Ubisoft Activations</span>
+                </a>
+                
+                <div class="nav-divider"></div>
+                <div class="nav-section-title" style="padding: 8px 16px; font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px;">📦 Sigma</div>
+                <a href="/dashboard/sigma" class="nav-item active">
+                    <span class="nav-icon">📦</span>
+                    <span>Sigma UI</span>
+                </a>
+                
+                <div class="nav-divider"></div>
+                
+                <a href="/dashboard/analytics" class="nav-item">
+                    <span class="nav-icon">📈</span>
+                    <span>Analytics</span>
+                </a>
+                <a href="/dashboard/activations" class="nav-item">
+                    <span class="nav-icon">✅</span>
+                    <span>Activated Users</span>
+                </a>
+                
+                <div class="nav-divider"></div>
+                
+                <a href="/dashboard/generate" class="nav-item">
+                    <span class="nav-icon">⚡</span>
+                    <span>Generate Token</span>
+                </a>
+                <a href="/dashboard/ticket-logs" class="nav-item">
+                    <span class="nav-icon">🎫</span>
+                    <span>Ticket Logs</span>
+                </a>
+                <a href="/dashboard/audit-logs" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    <span>Audit Logs</span>
+                </a>
+                <a href="/dashboard/staff-activity" class="nav-item">
+                    <span class="nav-icon">⏳</span>
+                    <span>Staff Activity</span>
+                </a>
+                <a href="/dashboard/macros" class="nav-item">
+                    <span class="nav-icon">📝</span>
+                    <span>Macros</span>
+                </a>
+                <a href="/dashboard/files" class="nav-item">
+                    <span class="nav-icon">📁</span>
+                    <span>File Manager</span>
+                </a>
+                <a href="/dashboard/users" class="nav-item">
+                    <span class="nav-icon">👥</span>
+                    <span>Users</span>
+                </a>
+            </nav>
+            
+            <% if (typeof user !== 'undefined' && user) { %>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-details">
+                        <span class="user-name"><%= user.username %></span>
+                        <span class="user-role">Staff</span>
+                    </div>
+                </div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h2>📁 App <%= appid %></h2>
+            </header>
+            
+            <div class="content-body">
+                <a href="/dashboard/sigma" class="btn btn-secondary back-btn">← Back to Sigma</a>
+                
+                <% if (success) { %>
+                    <div class="alert alert-success"><%= success %></div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger"><%= error %></div>
+                <% } %>
+
+                <!-- Upload File Section -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header">
+                        <h3>📤 Upload File</h3>
+                    </div>
+                    <div class="card-body">
+                        <form action="/dashboard/sigma/<%= appid %>/upload" method="POST" enctype="multipart/form-data" class="form-inline-flex">
+                            <div class="form-group">
+                                <label>File</label>
+                                <input type="file" name="file" required class="form-control">
+                            </div>
+                            <div class="form-group">
+                                <label>Custom filename (optional)</label>
+                                <input type="text" name="filename" placeholder="e.g. custom.lua" class="form-control" style="width: 200px;">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Upload</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Config Info -->
+                <% if (config && config.depots && Object.keys(config.depots).length > 0) { %>
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header">
+                        <h3>🔐 Decryption Keys (<%= Object.keys(config.depots).length %> depots)</h3>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Depot ID</th>
+                                    <th>Decryption Key</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% Object.entries(config.depots).forEach(([depotId, data]) => { %>
+                                    <tr>
+                                        <td><code><%= depotId %></code></td>
+                                        <td><code class="key-code"><%= data.DecryptionKey %></code></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <% } %>
+
+                <!-- Files List -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header">
+                        <h3>📄 Files (<%= files.length %>)</h3>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <% if (files.length === 0) { %>
+                            <div class="empty-state"><p>No files yet. Upload a file to get started.</p></div>
+                        <% } else { %>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Filename</th>
+                                        <th>Size</th>
+                                        <th>Modified</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% files.forEach(file => { %>
+                                        <tr>
+                                            <td>
+                                                <code><%= file.name %></code>
+                                                <% if (file.preview) { %>
+                                                    <details class="file-preview">
+                                                        <summary style="cursor: pointer; color: #888;">Preview</summary>
+                                                        <pre><%= file.preview %><% if (file.preview.length >= 500) { %>...</% } %></pre>
+                                                    </details>
+                                                <% } %>
+                                            </td>
+                                            <td><%= (file.size / 1024).toFixed(2) %> KB</td>
+                                            <td><%= new Date(file.modified).toLocaleString() %></td>
+                                            <td>
+                                                <a href="/dashboard/sigma/<%= appid %>/download/<%= file.name %>" class="btn btn-sm btn-info">Download</a>
+                                                <% if (file.name.endsWith('.json') || file.name.endsWith('.lua') || file.name.endsWith('.txt')) { %>
+                                                    <a href="/dashboard/sigma/<%= appid %>/edit/<%= file.name %>" class="btn btn-sm btn-warning">Edit</a>
+                                                <% } %>
+                                                <form action="/dashboard/sigma/<%= appid %>/delete/<%= file.name %>" method="POST" style="display:inline;" onsubmit="return confirm('Delete <%= file.name %>?')">
+                                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        <% } %>
+                    </div>
+                </div>
+
+                <!-- API Info -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header">
+                        <h3>🔌 API Access</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Access this app's files via API:</p>
+                        <ul style="color: #ccc; margin-left: 20px;">
+                            <li><code>GET /dashboard/api/sigma/games/<%= appid %></code> - List all files</li>
+                            <li><code>GET /dashboard/api/sigma/games/<%= appid %>/config.json</code> - Get config</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="card card-danger">
+                    <div class="card-header">
+                        <h3>⚠️ Danger Zone</h3>
+                    </div>
+                    <div class="card-body">
+                        <form action="/dashboard/sigma/<%= appid %>/delete-all" method="POST" onsubmit="return confirm('Are you sure? This will delete ALL files for app <%= appid %>!')">
+                            <button type="submit" class="btn btn-danger">Delete Entire App Folder</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Manager - Bartender Bot</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+        .navbar {
+            background: #16213e !important;
+        }
+        .card {
+            background: #16213e;
+            border: 1px solid #0f3460;
+        }
+        .breadcrumb {
+            background: #0f3460;
+            padding: 10px 15px;
+            border-radius: 5px;
+        }
+        .breadcrumb-item a {
+            color: #4da8da;
+            text-decoration: none;
+        }
+        .breadcrumb-item.active {
+            color: #eee;
+        }
+        .file-table {
+            background: #16213e;
+        }
+        .file-table th {
+            background: #0f3460;
+            color: #4da8da;
+            border-bottom: 2px solid #4da8da;
+        }
+        .file-table td {
+            border-color: #0f3460;
+            vertical-align: middle;
+        }
+        .file-table tr:hover {
+            background: #0f3460;
+        }
+        .file-table tr.selected {
+            background: #1e5f74 !important;
+        }
+        .file-icon {
+            font-size: 1.2rem;
+            margin-right: 8px;
+        }
+        .folder-icon { color: #ffc107; }
+        .file-icon-default { color: #6c757d; }
+        .file-icon-code { color: #28a745; }
+        .file-icon-config { color: #17a2b8; }
+        .file-icon-exe { color: #dc3545; }
+        .file-icon-archive { color: #6f42c1; }
+        .clickable {
+            cursor: pointer;
+        }
+        .toolbar {
+            background: #0f3460;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .toolbar .btn {
+            margin-right: 5px;
+        }
+        .editor-container {
+            display: none;
+        }
+        .editor-container.active {
+            display: block;
+        }
+        #fileContent {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            background: #1a1a2e;
+            color: #eee;
+            border: 1px solid #0f3460;
+            min-height: 400px;
+        }
+        .upload-zone {
+            border: 2px dashed #4da8da;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            background: #0f3460;
+            border-color: #28a745;
+        }
+        .modal-content {
+            background: #16213e;
+            border: 1px solid #0f3460;
+        }
+        .modal-header {
+            border-color: #0f3460;
+        }
+        .modal-footer {
+            border-color: #0f3460;
+        }
+        .form-control, .form-select {
+            background: #1a1a2e;
+            border-color: #0f3460;
+            color: #eee;
+        }
+        .form-control:focus, .form-select:focus {
+            background: #1a1a2e;
+            border-color: #4da8da;
+            color: #eee;
+            box-shadow: 0 0 0 0.2rem rgba(77, 168, 218, 0.25);
+        }
+        .context-menu {
+            position: fixed;
+            background: #16213e;
+            border: 1px solid #0f3460;
+            border-radius: 5px;
+            padding: 5px 0;
+            min-width: 150px;
+            z-index: 1000;
+            display: none;
+        }
+        .context-menu.show {
+            display: block;
+        }
+        .context-menu-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .context-menu-item:hover {
+            background: #0f3460;
+        }
+        .context-menu-divider {
+            border-top: 1px solid #0f3460;
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/dashboard">
+                <i class="bi bi-folder2-open me-2"></i>File Manager
+            </a>
+            <div>
+                <a href="/dashboard" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4">
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <button class="btn btn-success btn-sm" onclick="showUploadModal()">
+                <i class="bi bi-upload"></i> Upload
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="showNewFolderModal()">
+                <i class="bi bi-folder-plus"></i> New Folder
+            </button>
+            <button class="btn btn-info btn-sm" onclick="showNewFileModal()">
+                <i class="bi bi-file-plus"></i> New File
+            </button>
+            <div class="btn-group">
+                <button class="btn btn-secondary btn-sm" onclick="copySelected()" id="btnCopy" disabled>
+                    <i class="bi bi-clipboard"></i> Copy
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="cutSelected()" id="btnCut" disabled>
+                    <i class="bi bi-scissors"></i> Cut
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="pasteClipboard()" id="btnPaste" disabled>
+                    <i class="bi bi-clipboard-check"></i> Paste
+                </button>
+            </div>
+            <button class="btn btn-danger btn-sm" onclick="deleteSelected()" id="btnDelete" disabled>
+                <i class="bi bi-trash"></i> Delete
+            </button>
+            <button class="btn btn-outline-light btn-sm float-end" onclick="refreshView()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-3">
+            <ol class="breadcrumb mb-0" id="breadcrumb">
+                <li class="breadcrumb-item"><a href="#" onclick="navigate('')">Root</a></li>
+            </ol>
+        </nav>
+
+        <!-- File Browser -->
+        <div class="card" id="browserContainer">
+            <div class="card-body p-0">
+                <table class="table table-dark file-table mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width: 30px;">
+                                <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                            </th>
+                            <th>Name</th>
+                            <th style="width: 100px;">Size</th>
+                            <th style="width: 180px;">Modified</th>
+                            <th style="width: 100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fileList">
+                        <tr>
+                            <td colspan="5" class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <div class="mt-2">Loading...</div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- File Editor -->
+        <div class="card editor-container" id="editorContainer">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-file-text me-2"></i><span id="editorFileName">file.txt</span></span>
+                <div>
+                    <button class="btn btn-success btn-sm" onclick="saveFile()">
+                        <i class="bi bi-save"></i> Save
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="closeEditor()">
+                        <i class="bi bi-x"></i> Close
+                    </button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <textarea id="fileContent" class="form-control" style="border-radius: 0;"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" onclick="openItem()">
+            <i class="bi bi-folder2-open"></i> Open
+        </div>
+        <div class="context-menu-item" onclick="editItem()">
+            <i class="bi bi-pencil"></i> Edit
+        </div>
+        <div class="context-menu-item" onclick="downloadItem()">
+            <i class="bi bi-download"></i> Download
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" onclick="copySelected()">
+            <i class="bi bi-clipboard"></i> Copy
+        </div>
+        <div class="context-menu-item" onclick="cutSelected()">
+            <i class="bi bi-scissors"></i> Cut
+        </div>
+        <div class="context-menu-item" onclick="renameItem()">
+            <i class="bi bi-input-cursor-text"></i> Rename
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item text-danger" onclick="deleteSelected()">
+            <i class="bi bi-trash"></i> Delete
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="modal fade" id="uploadModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Upload Files</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                        <i class="bi bi-cloud-upload fs-1 mb-2"></i>
+                        <p class="mb-0">Click or drag files here to upload</p>
+                        <small class="text-muted">You can upload multiple files or folders</small>
+                    </div>
+                    <input type="file" id="fileInput" multiple hidden onchange="handleFileSelect(event)">
+                    <input type="file" id="folderInput" webkitdirectory hidden onchange="handleFolderSelect(event)">
+                    <div class="mt-3">
+                        <button class="btn btn-outline-primary btn-sm" onclick="document.getElementById('folderInput').click()">
+                            <i class="bi bi-folder"></i> Select Folder
+                        </button>
+                    </div>
+                    <div id="uploadProgress" class="mt-3" style="display: none;">
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 style="width: 0%; font-weight: bold; line-height: 25px;"></div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-2">
+                            <small class="text-muted" id="uploadStatus">Uploading...</small>
+                            <small class="text-info" id="uploadDetails"></small>
+                        </div>
+                        <small class="text-warning d-block mt-1">⚠️ Large files may take a while. Do not close this window.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Folder Modal -->
+    <div class="modal fade" id="newFolderModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-folder-plus me-2"></i>New Folder</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" class="form-control" id="newFolderName" placeholder="Folder name">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="createFolder()">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New File Modal -->
+    <div class="modal fade" id="newFileModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-file-plus me-2"></i>New File</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" class="form-control" id="newFileName" placeholder="filename.txt">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="createFile()">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Modal -->
+    <div class="modal fade" id="renameModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-input-cursor-text me-2"></i>Rename</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" class="form-control" id="renameInput" placeholder="New name">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="doRename()">Rename</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentPath = '';
+        let selectedItems = [];
+        let contextItem = null;
+        let editingFile = null;
+        let hasClipboard = false;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            navigate('');
+            checkClipboard();
+            
+            // Hide context menu on click elsewhere
+            document.addEventListener('click', () => {
+                document.getElementById('contextMenu').classList.remove('show');
+            });
+            
+            // Drag and drop for upload zone
+            const uploadZone = document.getElementById('uploadZone');
+            uploadZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadZone.classList.add('dragover');
+            });
+            uploadZone.addEventListener('dragleave', () => {
+                uploadZone.classList.remove('dragover');
+            });
+            uploadZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadZone.classList.remove('dragover');
+                handleDrop(e);
+            });
+        });
+
+        function getFileIcon(item) {
+            if (item.type === 'directory') {
+                return '<i class="bi bi-folder-fill file-icon folder-icon"></i>';
+            }
+            
+            const ext = item.name.split('.').pop().toLowerCase();
+            const iconMap = {
+                'exe': 'bi-file-earmark-binary file-icon-exe',
+                'dll': 'bi-file-earmark-binary file-icon-exe',
+                'bat': 'bi-terminal file-icon-code',
+                'cmd': 'bi-terminal file-icon-code',
+                'ps1': 'bi-terminal file-icon-code',
+                'sh': 'bi-terminal file-icon-code',
+                'js': 'bi-filetype-js file-icon-code',
+                'py': 'bi-filetype-py file-icon-code',
+                'json': 'bi-filetype-json file-icon-config',
+                'xml': 'bi-filetype-xml file-icon-config',
+                'ini': 'bi-gear file-icon-config',
+                'cfg': 'bi-gear file-icon-config',
+                'config': 'bi-gear file-icon-config',
+                'txt': 'bi-file-text file-icon-default',
+                'log': 'bi-file-text file-icon-default',
+                'md': 'bi-markdown file-icon-default',
+                'zip': 'bi-file-zip file-icon-archive',
+                '7z': 'bi-file-zip file-icon-archive',
+                'rar': 'bi-file-zip file-icon-archive'
+            };
+            
+            const iconClass = iconMap[ext] || 'bi-file-earmark file-icon-default';
+            return `<i class="bi ${iconClass} file-icon"></i>`;
+        }
+
+        async function navigate(path) {
+            currentPath = path;
+            selectedItems = [];
+            updateToolbarButtons();
+            
+            document.getElementById('browserContainer').style.display = 'block';
+            document.getElementById('editorContainer').classList.remove('active');
+            
+            try {
+                const response = await fetch(`/dashboard/files/browse?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error);
+                }
+                
+                updateBreadcrumb(data.path);
+                renderFileList(data.items, data.parent);
+                
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        function updateBreadcrumb(path) {
+            const breadcrumb = document.getElementById('breadcrumb');
+            let html = '<li class="breadcrumb-item"><a href="#" onclick="navigate(\'\')">Root</a></li>';
+            
+            if (path) {
+                const parts = path.split('/');
+                let currentPathBuild = '';
+                
+                parts.forEach((part, index) => {
+                    currentPathBuild += (index > 0 ? '/' : '') + part;
+                    const isLast = index === parts.length - 1;
+                    
+                    if (isLast) {
+                        html += `<li class="breadcrumb-item active">${part}</li>`;
+                    } else {
+                        html += `<li class="breadcrumb-item"><a href="#" onclick="navigate('${currentPathBuild}')">${part}</a></li>`;
+                    }
+                });
+            }
+            
+            breadcrumb.innerHTML = html;
+        }
+
+        function renderFileList(items, parent) {
+            const tbody = document.getElementById('fileList');
+            let html = '';
+            
+            // Parent directory link
+            if (parent !== null) {
+                html += `
+                    <tr class="clickable" ondblclick="navigate('${parent}')">
+                        <td></td>
+                        <td><i class="bi bi-arrow-up file-icon folder-icon"></i>..</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                `;
+            }
+            
+            if (items.length === 0) {
+                html += `
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            <i class="bi bi-folder-x fs-1"></i>
+                            <div class="mt-2">Empty folder</div>
+                        </td>
+                    </tr>
+                `;
+            } else {
+                items.forEach(item => {
+                    const modified = item.modified ? new Date(item.modified).toLocaleString() : '';
+                    html += `
+                        <tr data-path="${item.path}" data-type="${item.type}" data-editable="${item.editable}"
+                            onclick="selectItem(event, '${item.path}')"
+                            ondblclick="openItem('${item.path}', '${item.type}', ${item.editable})"
+                            oncontextmenu="showContextMenu(event, '${item.path}', '${item.type}', ${item.editable})">
+                            <td onclick="event.stopPropagation()">
+                                <input type="checkbox" class="item-checkbox" data-path="${item.path}" 
+                                       onchange="updateSelection()">
+                            </td>
+                            <td class="clickable">${getFileIcon(item)} ${item.name}</td>
+                            <td>${item.size || ''}</td>
+                            <td>${modified}</td>
+                            <td>
+                                ${item.type === 'file' ? `
+                                    <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); downloadFile('${item.path}')">
+                                        <i class="bi bi-download"></i>
+                                    </button>
+                                ` : ''}
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+            
+            tbody.innerHTML = html;
+        }
+
+        function selectItem(event, path) {
+            if (event.ctrlKey || event.metaKey) {
+                // Toggle selection
+                const checkbox = document.querySelector(`input[data-path="${path}"]`);
+                checkbox.checked = !checkbox.checked;
+            } else if (!event.target.matches('input[type="checkbox"]')) {
+                // Single select
+                document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = false);
+                const checkbox = document.querySelector(`input[data-path="${path}"]`);
+                if (checkbox) checkbox.checked = true;
+            }
+            updateSelection();
+        }
+
+        function updateSelection() {
+            selectedItems = [];
+            document.querySelectorAll('.item-checkbox:checked').forEach(cb => {
+                selectedItems.push(cb.dataset.path);
+            });
+            
+            // Update row highlighting
+            document.querySelectorAll('#fileList tr').forEach(tr => {
+                tr.classList.remove('selected');
+                if (selectedItems.includes(tr.dataset.path)) {
+                    tr.classList.add('selected');
+                }
+            });
+            
+            updateToolbarButtons();
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            document.querySelectorAll('.item-checkbox').forEach(cb => {
+                cb.checked = selectAll.checked;
+            });
+            updateSelection();
+        }
+
+        function updateToolbarButtons() {
+            const hasSelection = selectedItems.length > 0;
+            document.getElementById('btnCopy').disabled = !hasSelection;
+            document.getElementById('btnCut').disabled = !hasSelection;
+            document.getElementById('btnDelete').disabled = !hasSelection;
+            document.getElementById('btnPaste').disabled = !hasClipboard;
+        }
+
+        async function checkClipboard() {
+            try {
+                const response = await fetch('/dashboard/files/clipboard');
+                const data = await response.json();
+                hasClipboard = data.hasItems;
+                updateToolbarButtons();
+            } catch (err) {
+                console.error('Clipboard check error:', err);
+            }
+        }
+
+        function openItem(path, type, editable) {
+            path = path || contextItem?.path;
+            type = type || contextItem?.type;
+            editable = editable !== undefined ? editable : contextItem?.editable;
+            
+            if (type === 'directory') {
+                navigate(path);
+            } else if (editable) {
+                editFile(path);
+            } else {
+                downloadFile(path);
+            }
+        }
+
+        function editItem() {
+            if (contextItem && contextItem.editable) {
+                editFile(contextItem.path);
+            }
+        }
+
+        async function editFile(path) {
+            try {
+                const response = await fetch(`/dashboard/files/read?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error);
+                }
+                
+                editingFile = path;
+                document.getElementById('editorFileName').textContent = data.name;
+                document.getElementById('fileContent').value = data.content;
+                document.getElementById('browserContainer').style.display = 'none';
+                document.getElementById('editorContainer').classList.add('active');
+                
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function saveFile() {
+            if (!editingFile) return;
+            
+            try {
+                const response = await fetch('/dashboard/files/write', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        path: editingFile,
+                        content: document.getElementById('fileContent').value
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error);
+                }
+                
+                alert('File saved!');
+                
+            } catch (err) {
+                alert('Error saving: ' + err.message);
+            }
+        }
+
+        function closeEditor() {
+            editingFile = null;
+            document.getElementById('editorContainer').classList.remove('active');
+            document.getElementById('browserContainer').style.display = 'block';
+        }
+
+        function downloadFile(path) {
+            window.open(`/dashboard/files/download?path=${encodeURIComponent(path)}`, '_blank');
+        }
+
+        function downloadItem() {
+            if (contextItem) {
+                downloadFile(contextItem.path);
+            }
+        }
+
+        function showContextMenu(event, path, type, editable) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            contextItem = { path, type, editable };
+            
+            const menu = document.getElementById('contextMenu');
+            menu.style.left = event.pageX + 'px';
+            menu.style.top = event.pageY + 'px';
+            menu.classList.add('show');
+        }
+
+        async function copySelected() {
+            const paths = selectedItems.length > 0 ? selectedItems : (contextItem ? [contextItem.path] : []);
+            if (paths.length === 0) return;
+            
+            try {
+                const response = await fetch('/dashboard/files/copy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paths })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    hasClipboard = true;
+                    updateToolbarButtons();
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function cutSelected() {
+            const paths = selectedItems.length > 0 ? selectedItems : (contextItem ? [contextItem.path] : []);
+            if (paths.length === 0) return;
+            
+            try {
+                const response = await fetch('/dashboard/files/cut', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paths })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    hasClipboard = true;
+                    updateToolbarButtons();
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function pasteClipboard() {
+            if (!hasClipboard) return;
+            
+            try {
+                const response = await fetch('/dashboard/files/paste', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ destination: currentPath })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    refreshView();
+                    checkClipboard();
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function deleteSelected() {
+            const paths = selectedItems.length > 0 ? selectedItems : (contextItem ? [contextItem.path] : []);
+            if (paths.length === 0) return;
+            
+            if (!confirm(`Delete ${paths.length} item(s)?`)) return;
+            
+            try {
+                const response = await fetch('/dashboard/files/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paths })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    refreshView();
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        function renameItem() {
+            if (!contextItem) return;
+            
+            const name = contextItem.path.split('/').pop();
+            document.getElementById('renameInput').value = name;
+            new bootstrap.Modal(document.getElementById('renameModal')).show();
+        }
+
+        async function doRename() {
+            if (!contextItem) return;
+            
+            const newName = document.getElementById('renameInput').value.trim();
+            if (!newName) return;
+            
+            try {
+                const response = await fetch('/dashboard/files/rename', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        oldPath: contextItem.path,
+                        newName
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('renameModal')).hide();
+                    refreshView();
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        function showUploadModal() {
+            new bootstrap.Modal(document.getElementById('uploadModal')).show();
+        }
+
+        function showNewFolderModal() {
+            document.getElementById('newFolderName').value = '';
+            new bootstrap.Modal(document.getElementById('newFolderModal')).show();
+        }
+
+        function showNewFileModal() {
+            document.getElementById('newFileName').value = '';
+            new bootstrap.Modal(document.getElementById('newFileModal')).show();
+        }
+
+        async function createFolder() {
+            const name = document.getElementById('newFolderName').value.trim();
+            if (!name) return;
+            
+            const folderPath = currentPath ? `${currentPath}/${name}` : name;
+            
+            try {
+                const response = await fetch('/dashboard/files/create-folder', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: folderPath })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('newFolderModal')).hide();
+                    refreshView();
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function createFile() {
+            const name = document.getElementById('newFileName').value.trim();
+            if (!name) return;
+            
+            const filePath = currentPath ? `${currentPath}/${name}` : name;
+            
+            try {
+                const response = await fetch('/dashboard/files/write', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: filePath, content: '' })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('newFileModal')).hide();
+                    refreshView();
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        function handleFileSelect(event) {
+            uploadFiles(event.target.files);
+        }
+
+        function handleFolderSelect(event) {
+            uploadFiles(event.target.files);
+        }
+
+        function handleDrop(event) {
+            const files = event.dataTransfer.files;
+            uploadFiles(files);
+        }
+
+        async function uploadFiles(files) {
+            if (!files || files.length === 0) return;
+            
+            const formData = new FormData();
+            formData.append('destination', currentPath || 'generator');
+            
+            let totalSize = 0;
+            for (const file of files) {
+                formData.append('files', file, file.webkitRelativePath || file.name);
+                totalSize += file.size;
+            }
+            
+            const progressDiv = document.getElementById('uploadProgress');
+            const progressBar = progressDiv.querySelector('.progress-bar');
+            const statusText = document.getElementById('uploadStatus');
+            const progressDetails = document.getElementById('uploadDetails');
+            
+            progressDiv.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressBar.classList.remove('bg-danger', 'bg-success');
+            statusText.textContent = `Uploading ${files.length} file(s)...`;
+            
+            // Format bytes to human readable
+            function formatBytes(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
+            // Use XMLHttpRequest for progress tracking
+            const xhr = new XMLHttpRequest();
+            
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    progressBar.style.width = percent + '%';
+                    progressBar.textContent = percent + '%';
+                    statusText.textContent = `Uploading ${files.length} file(s)... ${percent}%`;
+                    if (progressDetails) {
+                        progressDetails.textContent = `${formatBytes(e.loaded)} / ${formatBytes(e.total)}`;
+                    }
+                }
+            });
+            
+            xhr.addEventListener('load', () => {
+                console.log('[Upload] XHR load event - status:', xhr.status);
+                console.log('[Upload] Response:', xhr.responseText);
+                if (xhr.status === 200) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        console.log('[Upload] Parsed response:', data);
+                        if (data.success) {
+                            progressBar.style.width = '100%';
+                            progressBar.textContent = '100%';
+                            progressBar.classList.add('bg-success');
+                            statusText.textContent = '✓ ' + data.message;
+                            if (progressDetails) {
+                                progressDetails.textContent = `${formatBytes(totalSize)} uploaded`;
+                            }
+                            setTimeout(() => {
+                                bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
+                                progressDiv.style.display = 'none';
+                                progressBar.textContent = '';
+                                refreshView();
+                            }, 1500);
+                        } else {
+                            throw new Error(data.error);
+                        }
+                    } catch (err) {
+                        console.error('[Upload] Parse error:', err);
+                        statusText.textContent = 'Error: ' + err.message;
+                        progressBar.classList.add('bg-danger');
+                    }
+                } else {
+                    console.log('[Upload] Non-200 status:', xhr.status, xhr.responseText);
+                    statusText.textContent = 'Error: Upload failed (HTTP ' + xhr.status + ')';
+                    progressBar.classList.add('bg-danger');
+                }
+            });
+            
+            xhr.addEventListener('error', () => {
+                statusText.textContent = 'Error: Network error during upload';
+                progressBar.classList.add('bg-danger');
+            });
+            
+            xhr.addEventListener('abort', () => {
+                statusText.textContent = 'Upload cancelled';
+                progressBar.classList.add('bg-danger');
+            });
+            
+            const uploadUrl = `/dashboard/files/upload?destination=${encodeURIComponent(currentPath || 'generator')}`;
+            console.log('[Upload] Opening XHR to:', uploadUrl);
+            console.log('[Upload] FormData entries:');
+            for (let pair of formData.entries()) {
+                console.log('[Upload]   ', pair[0], ':', pair[1] instanceof File ? `File: ${pair[1].name} (${pair[1].size} bytes)` : pair[1]);
+            }
+            xhr.open('POST', uploadUrl);
+            console.log('[Upload] Sending XHR...');
+            xhr.send(formData);
+            console.log('[Upload] XHR send() called');
+        }
+
+        function refreshView() {
+            navigate(currentPath);
+        }
+    </script>
+</body>
+</html>

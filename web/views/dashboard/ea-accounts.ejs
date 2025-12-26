@@ -1,0 +1,124 @@
+<%- include('_layout-start') %>
+
+<div class="content-header">
+    <h2>🔴 EA Accounts</h2>
+    <button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('active')">➕ Add Account</button>
+</div>
+
+<div class="content-body">
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Account Name</th>
+                        <th>Email</th>
+                        <th>TCNO Profile</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (accounts.length === 0) { %>
+                    <tr><td colspan="6" style="text-align:center; color:#888;">No accounts found</td></tr>
+                    <% } %>
+                    <% accounts.forEach(a => { %>
+                    <tr>
+                        <td><strong><%= a.account_name %></strong></td>
+                        <td><%= a.email || '-' %></td>
+                        <td><%= a.tcno_profile || '-' %></td>
+                        <td>
+                            <span class="badge <%= a.status === 'active' ? 'badge-success' : 'badge-closed' %>"><%= a.status %></span>
+                        </td>
+                        <td><%= new Date(a.created_at).toLocaleDateString() %></td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary" onclick="editAccount(<%= JSON.stringify(a).replace(/"/g, '&quot;') %>)">Edit</button>
+                            <form method="POST" action="/dashboard/ea/accounts/<%= a.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this account?')">
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Modal -->
+<div id="addModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>➕ Add EA Account</h3>
+            <button class="modal-close" onclick="document.getElementById('addModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST" action="/dashboard/ea/accounts/add">
+            <div class="form-group">
+                <label>Account Name</label>
+                <input type="text" name="account_name" class="form-control" required placeholder="e.g., mitch">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" class="form-control" placeholder="account@example.com">
+            </div>
+            <div class="form-group">
+                <label>TCNO Profile Name</label>
+                <input type="text" name="tcno_profile" class="form-control" placeholder="Profile name in TCNO">
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select name="status" class="form-control">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Account</button>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>✏️ Edit EA Account</h3>
+            <button class="modal-close" onclick="document.getElementById('editModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST" id="editForm">
+            <div class="form-group">
+                <label>Account Name</label>
+                <input type="text" name="account_name" id="edit_account_name" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" id="edit_email" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>TCNO Profile Name</label>
+                <input type="text" name="tcno_profile" id="edit_tcno_profile" class="form-control">
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select name="status" id="edit_status" class="form-control">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function editAccount(account) {
+    document.getElementById('editForm').action = '/dashboard/ea/accounts/' + account.id + '/edit';
+    document.getElementById('edit_account_name').value = account.account_name || '';
+    document.getElementById('edit_email').value = account.email || '';
+    document.getElementById('edit_tcno_profile').value = account.tcno_profile || '';
+    document.getElementById('edit_status').value = account.status || 'active';
+    document.getElementById('editModal').classList.add('active');
+}
+</script>
+
+<%- include('_layout-end') %>

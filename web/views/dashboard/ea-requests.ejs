@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EA Requests - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            min-height: 100vh;
+        }
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 250px;
+            background: #16213e;
+            padding: 20px 0;
+            border-right: 1px solid #0f3460;
+        }
+        .logo {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid #0f3460;
+            margin-bottom: 20px;
+        }
+        .logo h1 {
+            font-size: 1.5rem;
+            color: #e94560;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 20px;
+            color: #a0a0a0;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        .nav-item:hover, .nav-item.active {
+            background: #0f3460;
+            color: #fff;
+        }
+        .nav-icon {
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+        .nav-divider {
+            height: 1px;
+            background: #0f3460;
+            margin: 10px 20px;
+        }
+        .nav-section-title {
+            padding: 10px 20px 5px;
+            font-size: 0.75rem;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .main-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .page-title {
+            font-size: 1.8rem;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: #e94560;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: #ff6b6b;
+        }
+        .btn-secondary {
+            background: #0f3460;
+            color: #fff;
+        }
+        .btn-secondary:hover {
+            background: #1a4a7a;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .card {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #0f3460;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table th, .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #0f3460;
+        }
+        .table th {
+            background: #0f3460;
+            font-weight: 600;
+        }
+        .table tr:hover {
+            background: rgba(233, 69, 96, 0.1);
+        }
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-success {
+            background: #28a745;
+            color: #fff;
+        }
+        .badge-warning {
+            background: #ffc107;
+            color: #000;
+        }
+        .badge-danger {
+            background: #dc3545;
+            color: #fff;
+        }
+        .badge-info {
+            background: #17a2b8;
+            color: #fff;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .output-preview {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #888;
+        }
+        .expand-btn {
+            background: none;
+            border: none;
+            color: #e94560;
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 2px 5px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 30px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 1px solid #0f3460;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            color: #888;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        .data-block {
+            background: #1a1a2e;
+            border: 1px solid #0f3460;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-size: 0.85rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .data-label {
+            font-weight: bold;
+            color: #e94560;
+            margin-bottom: 10px;
+        }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .filter-bar select {
+            padding: 8px 12px;
+            border: 1px solid #0f3460;
+            border-radius: 5px;
+            background: #1a1a2e;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="layout">
+        <nav class="sidebar">
+            <div class="logo">
+                <h1>🍸 Bartender</h1>
+            </div>
+            <a href="/dashboard" class="nav-item">
+                <span class="nav-icon">🏠</span>
+                <span>Home</span>
+            </a>
+            <a href="/dashboard/games" class="nav-item">
+                <span class="nav-icon">🎮</span>
+                <span>Steam Games</span>
+            </a>
+            <a href="/dashboard/accounts" class="nav-item">
+                <span class="nav-icon">👥</span>
+                <span>Steam Accounts</span>
+            </a>
+            <a href="/dashboard/generate" class="nav-item">
+                <span class="nav-icon">🎫</span>
+                <span>Generate Tokens</span>
+            </a>
+            
+            <div class="nav-divider"></div>
+            <div class="nav-section-title">🟠 Ubisoft</div>
+            <a href="/dashboard/ubisoft" class="nav-item">
+                <span class="nav-icon">🎯</span>
+                <span>Ubisoft Games</span>
+            </a>
+            
+            <div class="nav-divider"></div>
+            <div class="nav-section-title">🔴 EA</div>
+            <a href="/dashboard/ea" class="nav-item">
+                <span class="nav-icon">🎮</span>
+                <span>EA Games</span>
+            </a>
+            <a href="/dashboard/ea/requests" class="nav-item active">
+                <span class="nav-icon">📋</span>
+                <span>EA Requests</span>
+            </a>
+            
+            <div class="nav-divider"></div>
+            <div class="nav-section-title">📦 Sigma</div>
+            <a href="/dashboard/sigma" class="nav-item">
+                <span class="nav-icon">📦</span>
+                <span>Sigma UI</span>
+            </a>
+            
+            <div class="nav-divider"></div>
+            <a href="/dashboard/settings" class="nav-item">
+                <span class="nav-icon">⚙️</span>
+                <span>Settings</span>
+            </a>
+            <a href="/logout" class="nav-item">
+                <span class="nav-icon">🚪</span>
+                <span>Logout</span>
+            </a>
+        </nav>
+        
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">📋 EA Requests</h1>
+                <div class="header-actions">
+                    <a href="/dashboard/ea" class="btn btn-secondary">← Back to EA Games</a>
+                    <form action="/dashboard/ea/requests/clear" method="POST" style="display:inline"
+                          onsubmit="return confirm('Clear all completed/failed requests?')">
+                        <button type="submit" class="btn btn-danger">Clear History</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card">
+                <% if (requests && requests.length > 0) { %>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>User</th>
+                                <th>Game</th>
+                                <th>Account</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Completed</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% for (const req of requests) { %>
+                                <tr>
+                                    <td>#<%= req.id %></td>
+                                    <td><%= req.username || req.user_id %></td>
+                                    <td><%= req.game_name || req.game_title || '-' %></td>
+                                    <td><%= req.account_name || '-' %></td>
+                                    <td>
+                                        <% if (req.status === 'completed') { %>
+                                            <span class="badge badge-success">Completed</span>
+                                        <% } else if (req.status === 'pending') { %>
+                                            <span class="badge badge-warning">Pending</span>
+                                        <% } else if (req.status === 'processing') { %>
+                                            <span class="badge badge-info">Processing</span>
+                                        <% } else { %>
+                                            <span class="badge badge-danger">Failed</span>
+                                        <% } %>
+                                    </td>
+                                    <td><%= new Date(req.created_at).toLocaleString() %></td>
+                                    <td><%= req.completed_at ? new Date(req.completed_at).toLocaleString() : '-' %></td>
+                                    <td>
+                                        <button class="expand-btn" 
+                                                onclick="viewDetails(<%= JSON.stringify(req).replace(/"/g, '&quot;') %>)">
+                                            View
+                                        </button>
+                                    </td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                <% } else { %>
+                    <div class="empty-state">
+                        <p>No requests found.</p>
+                    </div>
+                <% } %>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Details Modal -->
+    <div class="modal" id="detailsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Request Details</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="detailsContent"></div>
+        </div>
+    </div>
+    
+    <script>
+        function viewDetails(req) {
+            const content = document.getElementById('detailsContent');
+            content.innerHTML = `
+                <p><strong>Request ID:</strong> #${req.id}</p>
+                <p><strong>User:</strong> ${req.username || req.user_id}</p>
+                <p><strong>Game:</strong> ${req.game_name || req.game_title || '-'}</p>
+                <p><strong>Status:</strong> ${req.status}</p>
+                <p><strong>Created:</strong> ${new Date(req.created_at).toLocaleString()}</p>
+                ${req.completed_at ? `<p><strong>Completed:</strong> ${new Date(req.completed_at).toLocaleString()}</p>` : ''}
+                
+                <div class="data-label">Input Data:</div>
+                <div class="data-block">${escapeHtml(req.input_data || 'No input data')}</div>
+                
+                <div class="data-label">Output Data:</div>
+                <div class="data-block">${escapeHtml(req.output_data || 'No output data')}</div>
+            `;
+            document.getElementById('detailsModal').classList.add('active');
+        }
+        
+        function closeModal() {
+            document.getElementById('detailsModal').classList.remove('active');
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Close modal on outside click
+        document.getElementById('detailsModal').addEventListener('click', (e) => {
+            if (e.target.id === 'detailsModal') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

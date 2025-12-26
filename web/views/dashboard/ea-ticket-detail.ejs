@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <link rel="stylesheet" href="/dashboard/static/css/dashboard.css">
+    <style>
+        .nav-section-title { padding: 12px 20px 6px; font-size: 11px; text-transform: uppercase; color: #666; font-weight: 600; }
+        .card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .card-title { font-size: 1.2rem; margin-bottom: 15px; border-bottom: 1px solid #0f3460; padding-bottom: 10px; }
+        .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .info-item { background: #0f3460; padding: 12px; border-radius: 5px; }
+        .info-label { color: #888; font-size: 0.8rem; margin-bottom: 5px; }
+        .info-value { font-size: 1rem; word-break: break-all; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-pending { background: #ffc107; color: #000; }
+        .badge-processing { background: #17a2b8; color: #fff; }
+        .badge-completed { background: #28a745; color: #fff; }
+        .badge-failed { background: #dc3545; color: #fff; }
+        .badge-closed { background: #6c757d; color: #fff; }
+        .data-block { background: #1a1a2e; border: 1px solid #0f3460; border-radius: 5px; padding: 15px; font-family: monospace; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; font-size: 0.85rem; }
+        .btn { padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-secondary { background: #0f3460; color: #fff; }
+        .timeline { margin-top: 15px; }
+        .timeline-item { display: flex; gap: 15px; padding: 10px 0; border-left: 2px solid #0f3460; margin-left: 10px; padding-left: 20px; position: relative; }
+        .timeline-item::before { content: ''; position: absolute; left: -6px; top: 15px; width: 10px; height: 10px; border-radius: 50%; background: #e94560; }
+        .timeline-time { color: #666; font-size: 0.8rem; min-width: 150px; }
+        .timeline-content { flex: 1; }
+        .timeline-event { font-weight: bold; }
+        .timeline-details { color: #888; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header"><span class="logo">🍺</span><h1>Pub's Lounge</h1></div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/games" class="nav-item"><span class="nav-icon">🎮</span><span>Games</span></a>
+                <a href="/dashboard/accounts" class="nav-item"><span class="nav-icon">👤</span><span>Accounts</span></a>
+                <a href="/dashboard/tokens" class="nav-item"><span class="nav-icon">🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/transcripts" class="nav-item"><span class="nav-icon">📜</span><span>Transcripts</span></a>
+                <div class="nav-divider"></div>
+                <div class="nav-section-title">🔴 EA</div>
+                <a href="/dashboard/ea" class="nav-item"><span class="nav-icon">🎮</span><span>EA Games</span></a>
+                <a href="/dashboard/ea/tickets" class="nav-item active"><span class="nav-icon">🎫</span><span>EA Tickets</span></a>
+                <a href="/dashboard/ea/cooldowns" class="nav-item"><span class="nav-icon">⏱️</span><span>EA Cooldowns</span></a>
+                <a href="/dashboard/ea/transcripts" class="nav-item"><span class="nav-icon">📜</span><span>EA Transcripts</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item"><span class="nav-icon">📈</span><span>Analytics</span></a>
+                <a href="/dashboard/audit-logs" class="nav-item"><span class="nav-icon">📋</span><span>Audit Logs</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="" class="user-avatar" onerror="this.style.display='none'">
+                    <div class="user-details"><span class="user-name"><%= user.username %></span><span class="user-role">Staff</span></div>
+                </div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h2><%= title %></h2>
+                <a href="/dashboard/ea/tickets" class="btn btn-secondary">← Back to Tickets</a>
+            </header>
+            
+            <div class="content-body">
+                <div class="card">
+                    <div class="card-title">Ticket Information</div>
+                    <div class="info-grid">
+                        <div class="info-item"><div class="info-label">Ticket ID</div><div class="info-value"><code><%= ticket.ticket_id %></code></div></div>
+                        <div class="info-item"><div class="info-label">Status</div><div class="info-value"><span class="badge badge-<%= ticket.status %>"><%= ticket.status %></span></div></div>
+                        <div class="info-item"><div class="info-label">User</div><div class="info-value"><%= ticket.username || 'N/A' %></div></div>
+                        <div class="info-item"><div class="info-label">User ID</div><div class="info-value"><code><%= ticket.user_id %></code></div></div>
+                        <div class="info-item"><div class="info-label">Game</div><div class="info-value"><%= ticket.game_name || 'N/A' %></div></div>
+                        <div class="info-item"><div class="info-label">Game ID</div><div class="info-value"><%= ticket.game_id || 'N/A' %></div></div>
+                        <div class="info-item"><div class="info-label">Created</div><div class="info-value"><%= new Date(ticket.created_at).toLocaleString() %></div></div>
+                        <div class="info-item"><div class="info-label">Retry Count</div><div class="info-value"><%= ticket.retry_count || 0 %></div></div>
+                        <% if (ticket.completed_at) { %><div class="info-item"><div class="info-label">Completed</div><div class="info-value"><%= new Date(ticket.completed_at).toLocaleString() %></div></div><% } %>
+                        <% if (ticket.staff_name) { %><div class="info-item"><div class="info-label">Staff</div><div class="info-value"><%= ticket.staff_name %></div></div><% } %>
+                    </div>
+                </div>
+                
+                <% if (ticket.input_data) { %>
+                <div class="card">
+                    <div class="card-title">Input Data</div>
+                    <div class="data-block"><%= ticket.input_data %></div>
+                </div>
+                <% } %>
+                
+                <% if (ticket.output_data) { %>
+                <div class="card">
+                    <div class="card-title">Output Data / Token</div>
+                    <div class="data-block"><%= ticket.output_data %></div>
+                </div>
+                <% } %>
+                
+                <% if (ticket.failed_accounts) { %>
+                <div class="card">
+                    <div class="card-title">Failed Accounts</div>
+                    <div class="info-value"><code><%= ticket.failed_accounts %></code></div>
+                </div>
+                <% } %>
+                
+                <% if (logs && logs.length > 0) { %>
+                <div class="card">
+                    <div class="card-title">Event Log</div>
+                    <div class="timeline">
+                        <% for (const log of logs) { %>
+                            <div class="timeline-item">
+                                <div class="timeline-time"><%= new Date(log.created_at).toLocaleString() %></div>
+                                <div class="timeline-content">
+                                    <div class="timeline-event"><%= log.event_type %></div>
+                                    <% if (log.event_details) { %><div class="timeline-details"><%= log.event_details %></div><% } %>
+                                    <% if (log.staff_member) { %><div class="timeline-details">By: <%= log.staff_member %></div><% } %>
+                                </div>
+                            </div>
+                        <% } %>
+                    </div>
+                </div>
+                <% } %>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<%- include('_layout-start') %>
+
+<div class="content-header">
+    <h2>⚡ Macros</h2>
+    <a href="/dashboard/macros/add" class="btn btn-primary">➕ Add Macro</a>
+</div>
+
+<div class="content-body">
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Trigger</th>
+                        <th>Category</th>
+                        <th>Content Preview</th>
+                        <th>Created By</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (!macros || macros.length === 0) { %>
+                    <tr><td colspan="6" style="text-align:center; color:#888;">No macros defined</td></tr>
+                    <% } %>
+                    <% (macros || []).forEach(m => { %>
+                    <tr>
+                        <td><strong><%= m.name %></strong></td>
+                        <td><code>/<%= m.trigger %></code></td>
+                        <td><span class="badge badge-<%= m.category === 'support' ? 'steam' : m.category === 'info' ? 'ubisoft' : 'closed' %>"><%= m.category %></span></td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= m.content?.substring(0, 80) + (m.content?.length > 80 ? '...' : '') %></td>
+                        <td><%= m.created_by || 'System' %></td>
+                        <td>
+                            <a href="/dashboard/macros/<%= m.id %>/edit" class="btn btn-sm btn-secondary">Edit</a>
+                            <form method="POST" action="/dashboard/macros/<%= m.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this macro?')">
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+        <div class="card-title">ℹ️ Macro Usage</div>
+        <p style="color: #888; line-height: 1.6;">
+            Macros are quick responses that can be triggered in Discord using the trigger command. 
+            For example, if you create a macro with trigger <code>welcome</code>, staff can use 
+            <code>/macro welcome</code> to insert the macro content.
+        </p>
+    </div>
+</div>
+
+<%- include('_layout-end') %>

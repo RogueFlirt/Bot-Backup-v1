@@ -1,0 +1,104 @@
+<%- include('_layout-start') %>
+
+<div class="content-header">
+    <h2>👥 Staff Activity</h2>
+    <div class="filter-group">
+        <select onchange="location.href='?days='+this.value" class="form-control" style="width:auto;">
+            <option value="7" <%= days === 7 ? 'selected' : '' %>>Last 7 Days</option>
+            <option value="14" <%= days === 14 ? 'selected' : '' %>>Last 14 Days</option>
+            <option value="30" <%= days === 30 ? 'selected' : '' %>>Last 30 Days</option>
+            <option value="90" <%= days === 90 ? 'selected' : '' %>>Last 90 Days</option>
+        </select>
+    </div>
+</div>
+
+<div class="content-body">
+    <div class="card">
+        <div class="card-title">📊 Staff Performance (Last <%= days %> Days)</div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Staff Member</th>
+                        <th>Tickets Closed</th>
+                        <th>Tokens Delivered</th>
+                        <th>Avg Response Time</th>
+                        <th>Last Active</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (!activity || activity.length === 0) { %>
+                    <tr><td colspan="5" style="text-align:center; color:#888;">No activity data available</td></tr>
+                    <% } %>
+                    <% (activity || []).forEach(staff => { %>
+                    <tr>
+                        <td>
+                            <strong><%= staff.username || staff.staff_name %></strong>
+                            <% if (staff.role === 'admin') { %><span class="badge badge-ea" style="margin-left:5px;">Admin</span><% } %>
+                        </td>
+                        <td><%= staff.tickets_closed || 0 %></td>
+                        <td><%= staff.tokens_delivered || 0 %></td>
+                        <td><%= staff.avg_response_time ? (staff.avg_response_time + ' min') : 'N/A' %></td>
+                        <td><%= staff.last_active ? new Date(staff.last_active).toLocaleString() : 'Never' %></td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row-2">
+        <div class="card">
+            <div class="card-title">🏆 Top Performers</div>
+            <div class="leaderboard">
+                <% 
+                const sorted = (activity || []).sort((a, b) => (b.tickets_closed || 0) - (a.tickets_closed || 0)).slice(0, 5);
+                sorted.forEach((s, i) => { 
+                %>
+                <div class="leaderboard-item">
+                    <span class="rank"><%= i + 1 %></span>
+                    <span class="name"><%= s.username || s.staff_name %></span>
+                    <span class="score"><%= s.tickets_closed || 0 %> tickets</span>
+                </div>
+                <% }) %>
+                <% if (sorted.length === 0) { %>
+                <p style="color:#888; text-align:center;">No data</p>
+                <% } %>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📈 Activity Summary</div>
+            <div class="summary-grid">
+                <div class="summary-item">
+                    <div class="summary-value"><%= (activity || []).reduce((sum, s) => sum + (s.tickets_closed || 0), 0) %></div>
+                    <div class="summary-label">Total Tickets Closed</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value"><%= (activity || []).reduce((sum, s) => sum + (s.tokens_delivered || 0), 0) %></div>
+                    <div class="summary-label">Total Tokens Delivered</div>
+                </div>
+                <div class="summary-item">
+                    <div class="summary-value"><%= (activity || []).filter(s => s.last_active).length %></div>
+                    <div class="summary-label">Active Staff Members</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+@media (max-width: 900px) { .row-2 { grid-template-columns: 1fr; } }
+.leaderboard-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #0f3460; }
+.leaderboard-item:last-child { border-bottom: none; }
+.rank { width: 30px; height: 30px; border-radius: 50%; background: #e94560; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 12px; }
+.name { flex: 1; }
+.score { color: #888; }
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+.summary-item { text-align: center; padding: 15px; background: #1a1a2e; border-radius: 8px; }
+.summary-value { font-size: 1.8rem; font-weight: bold; color: #e94560; }
+.summary-label { font-size: 0.85rem; color: #888; margin-top: 5px; }
+</style>
+
+<%- include('_layout-end') %>

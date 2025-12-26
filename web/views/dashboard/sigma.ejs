@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <link rel="stylesheet" href="/dashboard/static/css/dashboard.css">
+    <style>
+        .form-inline-flex {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+        .form-inline-flex .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .font-mono {
+            font-family: monospace;
+        }
+        .api-docs {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .api-docs code {
+            background: #1a1a2e;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .api-docs p {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo">🍺</span>
+                <h1>Pub's Lounge</h1>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/dashboard/games" class="nav-item">
+                    <span class="nav-icon">🎮</span>
+                    <span>Games</span>
+                </a>
+                <a href="/dashboard/accounts" class="nav-item">
+                    <span class="nav-icon">👤</span>
+                    <span>Accounts</span>
+                </a>
+                <a href="/dashboard/tokens" class="nav-item">
+                    <span class="nav-icon">🎫</span>
+                    <span>Tokens</span>
+                </a>
+                <a href="/dashboard/transcripts" class="nav-item">
+                    <span class="nav-icon">📜</span>
+                    <span>Transcripts</span>
+                </a>
+                
+                <div class="nav-divider"></div>
+                <div class="nav-section-title" style="padding: 8px 16px; font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px;">🎯 Ubisoft</div>
+                <a href="/dashboard/ubisoft-games" class="nav-item">
+                    <span class="nav-icon">🎮</span>
+                    <span>Ubisoft Games</span>
+                </a>
+                <a href="/dashboard/ubisoft-accounts" class="nav-item">
+                    <span class="nav-icon">👤</span>
+                    <span>Ubisoft Accounts</span>
+                </a>
+                <a href="/dashboard/ubisoft-tokens" class="nav-item">
+                    <span class="nav-icon">🎫</span>
+                    <span>Ubisoft Tokens</span>
+                </a>
+                <a href="/dashboard/ubisoft-activations" class="nav-item">
+                    <span class="nav-icon">✅</span>
+                    <span>Ubisoft Activations</span>
+                </a>
+                
+                <div class="nav-divider"></div>
+                <div class="nav-section-title" style="padding: 8px 16px; font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px;">📦 Sigma</div>
+                <a href="/dashboard/sigma" class="nav-item active">
+                    <span class="nav-icon">📦</span>
+                    <span>Sigma UI</span>
+                </a>
+                
+                <div class="nav-divider"></div>
+                
+                <a href="/dashboard/analytics" class="nav-item">
+                    <span class="nav-icon">📈</span>
+                    <span>Analytics</span>
+                </a>
+                <a href="/dashboard/activations" class="nav-item">
+                    <span class="nav-icon">✅</span>
+                    <span>Activated Users</span>
+                </a>
+                
+                <div class="nav-divider"></div>
+                
+                <a href="/dashboard/generate" class="nav-item">
+                    <span class="nav-icon">⚡</span>
+                    <span>Generate Token</span>
+                </a>
+                <a href="/dashboard/ticket-logs" class="nav-item">
+                    <span class="nav-icon">🎫</span>
+                    <span>Ticket Logs</span>
+                </a>
+                <a href="/dashboard/audit-logs" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    <span>Audit Logs</span>
+                </a>
+                <a href="/dashboard/staff-activity" class="nav-item">
+                    <span class="nav-icon">⏳</span>
+                    <span>Staff Activity</span>
+                </a>
+                <a href="/dashboard/macros" class="nav-item">
+                    <span class="nav-icon">📝</span>
+                    <span>Macros</span>
+                </a>
+                <a href="/dashboard/files" class="nav-item">
+                    <span class="nav-icon">📁</span>
+                    <span>File Manager</span>
+                </a>
+                <a href="/dashboard/users" class="nav-item">
+                    <span class="nav-icon">👥</span>
+                    <span>Users</span>
+                </a>
+            </nav>
+            
+            <% if (typeof user !== 'undefined' && user) { %>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-details">
+                        <span class="user-name"><%= user.username %></span>
+                        <span class="user-role">Staff</span>
+                    </div>
+                </div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="content-header">
+                <h2>📦 <%= title %></h2>
+            </header>
+            
+            <div class="content-body">
+                <% if (success) { %>
+                    <div class="alert alert-success"><%= success %></div>
+                <% } %>
+                <% if (error) { %>
+                    <div class="alert alert-danger"><%= error %></div>
+                <% } %>
+
+                <!-- Upload VDF Section -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header">
+                        <h3>📤 Upload Config.vdf</h3>
+                    </div>
+                    <div class="card-body">
+                        <form action="/dashboard/sigma/upload-vdf" method="POST" enctype="multipart/form-data" class="form-inline-flex">
+                            <div class="form-group">
+                                <label>App ID</label>
+                                <input type="text" name="appid" placeholder="e.g. 228980" pattern="[0-9]+" required class="form-control" style="width: 150px;">
+                            </div>
+                            <div class="form-group">
+                                <label>VDF File</label>
+                                <input type="file" name="vdf_file" accept=".vdf,.txt" required class="form-control">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Upload & Parse</button>
+                        </form>
+                        <small style="color: #888; margin-top: 10px; display: block;">Parses depot IDs and decryption keys to config.json</small>
+                    </div>
+                </div>
+
+                <!-- Create New App Folder -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header">
+                        <h3>➕ Create App Folder</h3>
+                    </div>
+                    <div class="card-body">
+                        <form action="/dashboard/sigma/create-app" method="POST" class="form-inline-flex">
+                            <div class="form-group">
+                                <label>App ID</label>
+                                <input type="text" name="appid" placeholder="e.g. 228980" pattern="[0-9]+" required class="form-control" style="width: 150px;">
+                            </div>
+                            <button type="submit" class="btn btn-success">Create Folder</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- API Endpoints Info -->
+                <div class="card" style="margin-bottom: 20px;">
+                    <div class="card-header">
+                        <h3>🔌 API Endpoints</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="api-docs">
+                            <p><code>GET /dashboard/api/sigma/games</code> - List all app IDs</p>
+                            <p><code>GET /dashboard/api/sigma/games/{appid}</code> - List files in app folder</p>
+                            <p><code>GET /dashboard/api/sigma/games/{appid}/{filename}</code> - Download/get file content</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Games List -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📁 Game Configs (<%= games.length %>)</h3>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <% if (games.length === 0) { %>
+                            <div class="empty-state"><p>No game configs yet. Upload a config.vdf to get started.</p></div>
+                        <% } else { %>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>App ID</th>
+                                        <th>Files</th>
+                                        <th>Depots</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% games.forEach(game => { %>
+                                        <tr>
+                                            <td>
+                                                <a href="/dashboard/sigma/<%= game.appid %>" class="font-mono">
+                                                    <strong><%= game.appid %></strong>
+                                                </a>
+                                            </td>
+                                            <td><%= game.fileCount %> files</td>
+                                            <td><%= game.depotCount %> depots</td>
+                                            <td>
+                                                <% if (game.hasConfig) { %>
+                                                    <span class="badge badge-success">✓ Config</span>
+                                                <% } else { %>
+                                                    <span class="badge badge-warning">No config</span>
+                                                <% } %>
+                                            </td>
+                                            <td>
+                                                <a href="/dashboard/sigma/<%= game.appid %>" class="btn btn-sm btn-info">View</a>
+                                                <form action="/dashboard/sigma/<%= game.appid %>/delete-all" method="POST" style="display:inline;" onsubmit="return confirm('Delete ALL files for app <%= game.appid %>?')">
+                                                    <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    <% }) %>
+                                </tbody>
+                            </table>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

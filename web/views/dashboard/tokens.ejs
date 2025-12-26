@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <link rel="stylesheet" href="/dashboard/static/css/dashboard.css">
+    <style>
+        .timer { font-family: monospace; font-weight: bold; }
+        .timer.ready { color: var(--accent-success); }
+        .timer.soon { color: var(--accent-warning); }
+        .timer.waiting { color: var(--text-muted); }
+        .btn-reset { padding: 4px 8px; font-size: 11px; }
+        .reset-all-bar {
+            background: var(--bg-secondary);
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid var(--border-color);
+        }
+        .regen-stats {
+            display: flex;
+            gap: 24px;
+        }
+        .regen-stat {
+            text-align: center;
+        }
+        .regen-stat .value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .regen-stat .label {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .success-banner {
+            background: rgba(35, 165, 89, 0.2);
+            border: 1px solid var(--accent-success);
+            color: var(--accent-success);
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+        .badge-reserved {
+            background: #5865F2;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo">🍺</span>
+                <h1>Pub's Lounge</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/games" class="nav-item"><span class="nav-icon">🎮</span><span>Games</span></a>
+                <a href="/dashboard/accounts" class="nav-item"><span class="nav-icon">👤</span><span>Accounts</span></a>
+                <a href="/dashboard/tokens" class="nav-item active"><span class="nav-icon">🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/transcripts" class="nav-item"><span class="nav-icon">📜</span><span>Transcripts</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item"><span class="nav-icon">📈</span><span>Analytics</span></a>
+                <a href="/dashboard/activations" class="nav-item"><span class="nav-icon">✅</span><span>Activated Users</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/generate" class="nav-item"><span class="nav-icon">⚡</span><span>Generate Token</span></a>
+                <a href="/dashboard/ticket-logs" class="nav-item"><span class="nav-icon">🎫</span><span>Ticket Logs</span></a>
+                <a href="/dashboard/audit-logs" class="nav-item"><span class="nav-icon">📋</span><span>Audit Logs</span></a>
+                <a href="/dashboard/staff-activity" class="nav-item">
+                <span class="nav-icon">⏳</span>
+                <span>Staff Activity</span>
+            </a>
+            <a href="/dashboard/macros" class="nav-item">
+                <span class="nav-icon">📝</span>
+                <span>Macros</span>
+            </a>
+            <a href="/dashboard/files" class="nav-item"><span class="nav-icon">📁</span><span>File Manager</span></a>
+                
+                <div class="nav-divider"></div>
+                
+                <div class="nav-section-title">🟠 Ubisoft</div>
+                <a href="/dashboard/ubisoft" class="nav-item"><span class="nav-icon">🎮</span><span>Ubisoft Games</span></a>
+                
+                <div class="nav-divider"></div>
+                
+                <div class="nav-section-title">🔴 EA</div>
+                <a href="/dashboard/ea" class="nav-item"><span class="nav-icon">🎮</span><span>EA Games</span></a>
+                <a href="/dashboard/ea/requests" class="nav-item"><span class="nav-icon">📋</span><span>EA Requests</span></a>
+                
+                <div class="nav-divider"></div>
+                
+                <div class="nav-section-title">📦 Sigma</div>
+                <a href="/dashboard/sigma" class="nav-item"><span class="nav-icon">📦</span><span>Sigma UI</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="" class="user-avatar" onerror="this.style.display='none'">
+                    <div class="user-details">
+                        <span class="user-name"><%= user.username %></span>
+                        <span class="user-role">Staff</span>
+                    </div>
+                </div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h2><%= title %></h2>
+                <div class="header-actions">
+                    <a href="/dashboard/tokens/bulk-add" class="btn btn-success">➕ Bulk Add Tokens</a>
+                    <a href="/dashboard/generate" class="btn btn-primary">⚡ Generate Token</a>
+                </div>
+            </header>
+            
+            <div class="content-body">
+                <script>
+                    const params = new URLSearchParams(window.location.search);
+                    const success = params.get('success');
+                    if (success) {
+                        const messages = {
+                            'reset': '✅ Token reset successfully!',
+                            'reset-all': '✅ All tokens reset successfully!',
+                            'reset-filtered': '✅ Filtered tokens reset successfully!',
+                            'released-reserved': '🔓 All reserved tokens released!',
+                            'used': '⏱️ Token marked as used!',
+                            'used-all': '⏱️ All tokens marked as used!',
+                            'bulk-added': '✅ Bulk tokens added! Count: ' + (params.get('count') || '?'),
+                            'token-added': '✅ Token added successfully!',
+                            'deleted': '🗑️ Token deleted successfully!',
+                            'deleted-game-account': '🗑️ Deleted ' + (params.get('count') || '?') + ' tokens!'
+                        };
+                        if (messages[success]) {
+                            document.write('<div class="success-banner">' + messages[success] + '</div>');
+                        }
+                    }
+                </script>
+                
+                <!-- Stats Bar WITH RESERVED -->
+                <div class="reset-all-bar">
+                    <div class="regen-stats">
+                        <div class="regen-stat">
+                            <div class="value" style="color: #23a559;"><%= typeof regenStats !== 'undefined' ? regenStats.available : 0 %></div>
+                            <div class="label">Available</div>
+                        </div>
+                        <div class="regen-stat">
+                            <div class="value" style="color: #5865F2;"><%= typeof regenStats !== 'undefined' ? (regenStats.reserved || 0) : 0 %></div>
+                            <div class="label">🔒 Reserved</div>
+                        </div>
+                        <div class="regen-stat">
+                            <div class="value" style="color: #f0b232;"><%= typeof regenStats !== 'undefined' ? regenStats.regenerating : 0 %></div>
+                            <div class="label">Regenerating</div>
+                        </div>
+                        <div class="regen-stat">
+                            <div class="value" style="color: #5865F2;"><%= typeof regenStats !== 'undefined' ? regenStats.within1h : 0 %></div>
+                            <div class="label">Ready in &lt;1h</div>
+                        </div>
+                        <div class="regen-stat">
+                            <div class="value"><%= typeof regenStats !== 'undefined' ? regenStats.within6h : 0 %></div>
+                            <div class="label">Ready in &lt;6h</div>
+                        </div>
+                    </div>
+                    <div>
+                        <form method="POST" action="/dashboard/tokens/release-reserved" style="display: inline;" 
+                              onsubmit="return confirm('🔓 Release ALL reserved tokens back to available?');">
+                            <button type="submit" class="btn btn-secondary">🔓 Release Reserved</button>
+                        </form>
+                        <form method="POST" action="/dashboard/tokens/use-all" style="display: inline; margin-left: 8px;" 
+                              onsubmit="return confirm('⚠️ Mark ALL available tokens as used? (Testing only)');">
+                            <input type="hidden" name="game" value="<%= filters.game || '' %>">
+                            <input type="hidden" name="status" value="<%= filters.status || '' %>">
+                            <input type="hidden" name="account" value="<%= filters.account || '' %>">
+                            <button type="submit" class="btn btn-warning">⏱️ Use All Tokens</button>
+                        </form>
+                        <form method="POST" action="/dashboard/tokens/reset-all" style="display: inline; margin-left: 8px;" 
+                              onsubmit="return confirm('⚠️ Reset ALL tokens to available?');">
+                            <input type="hidden" name="game" value="<%= filters.game || '' %>">
+                            <input type="hidden" name="status" value="<%= filters.status || '' %>">
+                            <input type="hidden" name="account" value="<%= filters.account || '' %>">
+                            <button type="submit" class="btn btn-success">🔄 Reset All Tokens</button>
+                        </form>
+                        <% if (filters.game || filters.status || filters.account) { %>
+                        <form method="POST" action="/dashboard/tokens/reset-filtered" style="display: inline; margin-left: 8px;">
+                            <input type="hidden" name="game" value="<%= filters.game || '' %>">
+                            <input type="hidden" name="status" value="<%= filters.status || '' %>">
+                            <input type="hidden" name="account" value="<%= filters.account || '' %>">
+                            <button type="submit" class="btn btn-secondary" onclick="return confirm('Reset filtered tokens?');">
+                                🔄 Reset Filtered
+                            </button>
+                        </form>
+                        <% } %>
+                    </div>
+                </div>
+                
+                <!-- Filters WITH RESERVED OPTION -->
+                <form class="filters" method="GET">
+                    <div class="form-group">
+                        <label class="form-label">Game</label>
+                        <select name="game" class="form-select">
+                            <option value="">All Games</option>
+                            <% games.forEach(g => { %>
+                            <option value="<%= g.id %>" <%= filters.game == g.id ? 'selected' : '' %>><%= g.game_name %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select name="status" class="form-select">
+                            <option value="">All</option>
+                            <option value="available" <%= filters.status === 'available' ? 'selected' : '' %>>Available</option>
+                            <option value="reserved" <%= filters.status === 'reserved' ? 'selected' : '' %>>🔒 Reserved</option>
+                            <option value="used" <%= filters.status === 'used' ? 'selected' : '' %>>Used/Regenerating</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Account</label>
+                        <select name="account" class="form-select">
+                            <option value="">All Accounts</option>
+                            <% accounts.forEach(a => { %>
+                            <option value="<%= a.id %>" <%= filters.account == a.id ? 'selected' : '' %>>#<%= a.account_number %> - <%= a.account_name %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="submit" class="btn btn-primary">Filter</button>
+                    </div>
+                </form>
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Game</th>
+                                <th>Account</th>
+                                <th>Slot</th>
+                                <th>Status</th>
+                                <th>Regen Timer / Ticket</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (tokens.length > 0) { %>
+                                <% tokens.forEach(t => { %>
+                                <tr>
+                                    <td><%= t.id %></td>
+                                    <td><%= t.game_name || t.game_id %></td>
+                                    <td>#<%= t.account_number %> - <%= t.account_name || 'Unknown' %></td>
+                                    <td><%= t.token_number || '-' %></td>
+                                    <td>
+                                        <% if (t.reserved_by_ticket) { %>
+                                        <span class="badge badge-reserved" title="Reserved by <%= t.reserved_by_ticket %>">
+                                            🔒 reserved
+                                        </span>
+                                        <% } else { %>
+                                        <span class="badge badge-<%= t.status === 'available' ? 'success' : 'warning' %>">
+                                            <%= t.status %>
+                                        </span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (t.reserved_by_ticket) { %>
+                                        <span class="timer" style="color: #5865F2;">🎫 <%= t.reserved_by_ticket %></span>
+                                        <% } else if (t.status === 'used' && t.regenerates_at) { %>
+                                        <span class="timer" data-regen="<%= t.regenerates_at %>">Calculating...</span>
+                                        <% } else if (t.status === 'available') { %>
+                                        <span class="timer ready">✅ Ready</span>
+                                        <% } else { %>
+                                        <span class="timer waiting">-</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (t.status === 'used' || t.reserved_by_ticket) { %>
+                                        <form method="POST" action="/dashboard/tokens/<%= t.id %>/reset" style="display: inline;">
+                                            <input type="hidden" name="game" value="<%= filters.game || '' %>">
+                                            <input type="hidden" name="status" value="<%= filters.status || '' %>">
+                                            <input type="hidden" name="account" value="<%= filters.account || '' %>">
+                                            <button type="submit" class="btn btn-sm btn-success btn-reset" title="Reset to available">🔄</button>
+                                        </form>
+                                        <% } else { %>
+                                        <form method="POST" action="/dashboard/tokens/<%= t.id %>/use" style="display: inline;">
+                                            <input type="hidden" name="game" value="<%= filters.game || '' %>">
+                                            <input type="hidden" name="status" value="<%= filters.status || '' %>">
+                                            <input type="hidden" name="account" value="<%= filters.account || '' %>">
+                                            <button type="submit" class="btn btn-sm btn-warning btn-reset" title="Mark as used">⏱️</button>
+                                        </form>
+                                        <% } %>
+                                        <form method="POST" action="/dashboard/tokens/<%= t.id %>/delete" style="display: inline; margin-left: 4px;">
+                                            <input type="hidden" name="game" value="<%= filters.game || '' %>">
+                                            <input type="hidden" name="status" value="<%= filters.status || '' %>">
+                                            <input type="hidden" name="account" value="<%= filters.account || '' %>">
+                                            <button type="submit" class="btn btn-sm btn-danger btn-reset" title="Delete" onclick="return confirm('Delete this token?');">🗑️</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <% }) %>
+                            <% } else { %>
+                            <tr>
+                                <td colspan="7" class="empty-state">No tokens found</td>
+                            </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <% if (pagination.totalPages > 1) { %>
+                <div class="pagination">
+                    <% if (pagination.page > 1) { %>
+                    <a href="?page=<%= pagination.page - 1 %>&game=<%= filters.game || '' %>&status=<%= filters.status || '' %>&account=<%= filters.account || '' %>">← Prev</a>
+                    <% } %>
+                    <span class="active">Page <%= pagination.page %> of <%= pagination.totalPages %></span>
+                    <% if (pagination.page < pagination.totalPages) { %>
+                    <a href="?page=<%= pagination.page + 1 %>&game=<%= filters.game || '' %>&status=<%= filters.status || '' %>&account=<%= filters.account || '' %>">Next →</a>
+                    <% } %>
+                </div>
+                <% } %>
+                
+                <p style="text-align: center; margin-top: 16px; color: var(--text-muted);">
+                    Showing <%= tokens.length %> of <%= pagination.totalCount %> tokens
+                </p>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        function updateTimers() {
+            const timers = document.querySelectorAll('.timer[data-regen]');
+            const now = new Date().getTime();
+            
+            timers.forEach(timer => {
+                const regenTime = new Date(timer.dataset.regen).getTime();
+                const diff = regenTime - now;
+                
+                if (diff <= 0) {
+                    timer.innerHTML = '✅ Ready!';
+                    timer.className = 'timer ready';
+                } else {
+                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    const secs = Math.floor((diff % (1000 * 60)) / 1000);
+                    
+                    if (hours > 0) {
+                        timer.innerHTML = `${hours}h ${mins}m ${secs}s`;
+                    } else if (mins > 0) {
+                        timer.innerHTML = `${mins}m ${secs}s`;
+                    } else {
+                        timer.innerHTML = `${secs}s`;
+                    }
+                    
+                    timer.className = diff < 5 * 60 * 1000 ? 'timer soon' : 'timer waiting';
+                }
+            });
+        }
+        
+        updateTimers();
+        setInterval(updateTimers, 1000);
+    </script>
+</body>
+</html>

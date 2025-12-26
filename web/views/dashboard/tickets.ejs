@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
+        .dashboard-container { display: flex; min-height: 100vh; }
+        .sidebar { width: 260px; background: linear-gradient(180deg, #12121a 0%, #0d0d14 100%); border-right: 1px solid #1a1a2e; position: fixed; height: 100vh; overflow-y: auto; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #1a1a2e; display: flex; align-items: center; gap: 12px; }
+        .sidebar-header .logo { font-size: 2rem; }
+        .sidebar-header h1 { font-size: 1.1rem; color: #e94560; }
+        .sidebar-nav { padding: 15px 0; }
+        .nav-section { padding: 8px 20px; font-size: 11px; text-transform: uppercase; color: #666; font-weight: 600; margin-top: 10px; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #888; text-decoration: none; border-left: 3px solid transparent; }
+        .nav-item:hover { background: rgba(233, 69, 96, 0.1); color: #fff; }
+        .nav-item.active { background: rgba(233, 69, 96, 0.15); color: #e94560; border-left-color: #e94560; }
+        .nav-divider { height: 1px; background: #1a1a2e; margin: 10px 20px; }
+        .sidebar-footer { padding: 15px 20px; border-top: 1px solid #1a1a2e; position: absolute; bottom: 0; width: 100%; }
+        .logout-btn { display: block; text-align: center; padding: 8px; background: rgba(220, 53, 69, 0.2); color: #dc3545; text-decoration: none; border-radius: 5px; margin-top: 10px; }
+        .main-content { flex: 1; margin-left: 260px; }
+        .content-header { padding: 20px 30px; background: #12121a; border-bottom: 1px solid #1a1a2e; display: flex; justify-content: space-between; align-items: center; }
+        .content-body { padding: 25px 30px; }
+        .stats-row { display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap; }
+        .stat-mini { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 15px 25px; text-align: center; min-width: 120px; }
+        .stat-mini .value { font-size: 1.8rem; font-weight: bold; }
+        .stat-mini .label { font-size: 0.8rem; color: #888; }
+        .stat-mini.steam .value { color: #66c0f4; }
+        .stat-mini.ubisoft .value { color: #0070ff; }
+        .stat-mini.ea .value { color: #ff4747; }
+        .stat-mini.total .value { color: #e94560; }
+        .tabs { display: flex; gap: 5px; margin-bottom: 20px; background: #0f3460; padding: 5px; border-radius: 8px; flex-wrap: wrap; }
+        .tab { padding: 10px 20px; border-radius: 5px; text-decoration: none; color: #888; }
+        .tab:hover, .tab.active { background: #e94560; color: #fff; }
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-btn { padding: 8px 16px; background: #16213e; border: 1px solid #0f3460; color: #888; text-decoration: none; border-radius: 5px; font-size: 0.85rem; }
+        .filter-btn:hover, .filter-btn.active { background: #0f3460; color: #fff; border-color: #e94560; }
+        .card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #0f3460; }
+        .table th { background: #0f3460; font-weight: 600; font-size: 0.85rem; }
+        .table tr:hover { background: rgba(233, 69, 96, 0.05); }
+        .badge { padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-steam { background: #1b2838; color: #66c0f4; }
+        .badge-ubisoft { background: #0070ff; color: #fff; }
+        .badge-ea { background: #ff4747; color: #fff; }
+        .badge-open { background: #ffc107; color: #000; }
+        .badge-pending { background: #17a2b8; color: #fff; }
+        .badge-processing { background: #6f42c1; color: #fff; }
+        .badge-completed { background: #28a745; color: #fff; }
+        .badge-closed { background: #6c757d; color: #fff; }
+        .badge-failed { background: #dc3545; color: #fff; }
+        .btn { padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; font-size: 0.85rem; }
+        .btn-primary { background: #e94560; color: #fff; }
+        .btn-danger { background: #dc3545; color: #fff; }
+        .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
+        .empty-state { text-align: center; padding: 60px; color: #666; }
+        .ticket-actions { display: flex; gap: 5px; }
+        .auto-refresh { display: flex; align-items: center; gap: 10px; color: #888; font-size: 0.85rem; }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header"><span class="logo">🍺</span><h1>Pub's Lounge</h1></div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span>📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/tickets" class="nav-item active"><span>🎫</span><span>Live Tickets</span></a>
+                <div class="nav-section">🎮 Steam</div>
+                <a href="/dashboard/steam/games" class="nav-item"><span>🎮</span><span>Games</span></a>
+                <a href="/dashboard/steam/accounts" class="nav-item"><span>👤</span><span>Accounts</span></a>
+                <a href="/dashboard/steam/tokens" class="nav-item"><span>🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/steam/transcripts" class="nav-item"><span>📜</span><span>Transcripts</span></a>
+                <a href="/dashboard/steam/activations" class="nav-item"><span>✅</span><span>Activations</span></a>
+                <div class="nav-section">🎯 Ubisoft</div>
+                <a href="/dashboard/ubisoft/games" class="nav-item"><span>🎮</span><span>Games</span></a>
+                <a href="/dashboard/ubisoft/accounts" class="nav-item"><span>👤</span><span>Accounts</span></a>
+                <a href="/dashboard/ubisoft/tokens" class="nav-item"><span>🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/ubisoft/transcripts" class="nav-item"><span>📜</span><span>Transcripts</span></a>
+                <a href="/dashboard/ubisoft/activations" class="nav-item"><span>✅</span><span>Activations</span></a>
+                <div class="nav-section">🔴 EA</div>
+                <a href="/dashboard/ea/games" class="nav-item"><span>🎮</span><span>Games</span></a>
+                <a href="/dashboard/ea/transcripts" class="nav-item"><span>📜</span><span>Transcripts</span></a>
+                <a href="/dashboard/ea/activations" class="nav-item"><span>✅</span><span>Activations</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item"><span>📈</span><span>Analytics</span></a>
+                <a href="/dashboard/cooldowns" class="nav-item"><span>⏱️</span><span>Cooldowns</span></a>
+                <a href="/dashboard/audit-logs" class="nav-item"><span>📋</span><span>Audit Logs</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer">
+                <div><%= user.username %> (<%= user.role %>)</div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h2>🎫 Live Tickets</h2>
+                <div class="auto-refresh">
+                    <span class="pulse">●</span> Auto-refresh: 30s
+                    <button class="btn btn-sm btn-primary" onclick="location.reload()">Refresh Now</button>
+                </div>
+            </header>
+            
+            <div class="content-body">
+                <div class="stats-row">
+                    <div class="stat-mini total"><div class="value"><%= counts.open %></div><div class="label">Total Open</div></div>
+                    <div class="stat-mini steam"><div class="value"><%= counts.steam %></div><div class="label">Steam</div></div>
+                    <div class="stat-mini ubisoft"><div class="value"><%= counts.ubisoft %></div><div class="label">Ubisoft</div></div>
+                    <div class="stat-mini ea"><div class="value"><%= counts.ea %></div><div class="label">EA</div></div>
+                </div>
+                
+                <div class="tabs">
+                    <a href="/dashboard/tickets?platform=all&status=<%= currentStatus %>" class="tab <%= currentPlatform === 'all' ? 'active' : '' %>">All Platforms</a>
+                    <a href="/dashboard/tickets?platform=steam&status=<%= currentStatus %>" class="tab <%= currentPlatform === 'steam' ? 'active' : '' %>">🎮 Steam</a>
+                    <a href="/dashboard/tickets?platform=ubisoft&status=<%= currentStatus %>" class="tab <%= currentPlatform === 'ubisoft' ? 'active' : '' %>">🎯 Ubisoft</a>
+                    <a href="/dashboard/tickets?platform=ea&status=<%= currentStatus %>" class="tab <%= currentPlatform === 'ea' ? 'active' : '' %>">🔴 EA</a>
+                </div>
+                
+                <div class="filter-bar">
+                    <a href="/dashboard/tickets?platform=<%= currentPlatform %>&status=open" class="filter-btn <%= currentStatus === 'open' ? 'active' : '' %>">Open</a>
+                    <a href="/dashboard/tickets?platform=<%= currentPlatform %>&status=pending" class="filter-btn <%= currentStatus === 'pending' ? 'active' : '' %>">Pending</a>
+                    <a href="/dashboard/tickets?platform=<%= currentPlatform %>&status=completed" class="filter-btn <%= currentStatus === 'completed' ? 'active' : '' %>">Completed</a>
+                    <a href="/dashboard/tickets?platform=<%= currentPlatform %>&status=closed" class="filter-btn <%= currentStatus === 'closed' ? 'active' : '' %>">Closed</a>
+                    <a href="/dashboard/tickets?platform=<%= currentPlatform %>&status=all" class="filter-btn <%= currentStatus === 'all' ? 'active' : '' %>">All</a>
+                </div>
+                
+                <div class="card">
+                    <% if (tickets && tickets.length > 0) { %>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Ticket ID</th>
+                                <th>Platform</th>
+                                <th>User</th>
+                                <th>Game</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% tickets.forEach(ticket => { %>
+                            <tr>
+                                <td><code><%= ticket.ticket_id %></code></td>
+                                <td><span class="badge badge-<%= ticket.platform %>"><%= ticket.platform.toUpperCase() %></span></td>
+                                <td><%= ticket.username || ticket.user_id %></td>
+                                <td><%= ticket.game_name || '-' %></td>
+                                <td><span class="badge badge-<%= ticket.status %>"><%= ticket.status %></span></td>
+                                <td><%= new Date(ticket.created_at).toLocaleString() %></td>
+                                <td class="ticket-actions">
+                                    <a href="/dashboard/tickets/<%= ticket.id %>" class="btn btn-sm btn-primary">View</a>
+                                    <% if (!['closed', 'completed', 'cancelled'].includes(ticket.status)) { %>
+                                    <button class="btn btn-sm btn-danger" onclick="closeTicket(<%= ticket.id %>)">Close</button>
+                                    <% } %>
+                                </td>
+                            </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                    <% } else { %>
+                    <div class="empty-state">
+                        <div style="font-size: 3rem; margin-bottom: 10px;">🎫</div>
+                        <p>No tickets found</p>
+                    </div>
+                    <% } %>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // Auto-refresh every 30 seconds
+        setTimeout(() => location.reload(), 30000);
+        
+        function closeTicket(id) {
+            if (!confirm('Close this ticket?')) return;
+            const reason = prompt('Close reason (optional):') || 'Closed from dashboard';
+            
+            fetch('/dashboard/tickets/' + id + '/close', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason })
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.success) location.reload();
+                else alert('Error: ' + (d.error || 'Unknown'));
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<%- include('_layout-start') %>
+
+<div class="content-header">
+    <h2>🎫 Ticket <%= ticket.ticket_id %></h2>
+    <a href="/dashboard/tickets" class="btn btn-secondary">← Back to Tickets</a>
+</div>
+
+<div class="content-body">
+    <div class="row-2">
+        <!-- Ticket Info -->
+        <div class="card">
+            <div class="card-title">Ticket Details</div>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Platform</span>
+                    <span class="badge badge-<%= ticket.platform %>"><%= ticket.platform %></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Status</span>
+                    <span class="badge badge-<%= ticket.status %>"><%= ticket.status %></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">User ID</span>
+                    <code><%= ticket.user_id %></code>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Username</span>
+                    <span><%= ticket.username || 'Unknown' %></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Game</span>
+                    <span><%= ticket.game_name || ticket.game_id %></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Thread ID</span>
+                    <code><%= ticket.thread_id || 'N/A' %></code>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Created</span>
+                    <span><%= new Date(ticket.created_at).toLocaleString() %></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Updated</span>
+                    <span><%= new Date(ticket.updated_at).toLocaleString() %></span>
+                </div>
+                <% if (ticket.closed_at) { %>
+                <div class="detail-item">
+                    <span class="detail-label">Closed</span>
+                    <span><%= new Date(ticket.closed_at).toLocaleString() %></span>
+                </div>
+                <% } %>
+                <% if (ticket.close_reason) { %>
+                <div class="detail-item">
+                    <span class="detail-label">Close Reason</span>
+                    <span><%= ticket.close_reason %></span>
+                </div>
+                <% } %>
+            </div>
+
+            <% if (ticket.status !== 'closed' && ticket.status !== 'completed') { %>
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #0f3460;">
+                <button class="btn btn-danger" onclick="closeTicket()">Close Ticket</button>
+            </div>
+            <% } %>
+        </div>
+
+        <!-- Transcript -->
+        <div class="card">
+            <div class="card-title">💬 Transcript</div>
+            <% if (transcript && transcript.messages_json) { %>
+            <div class="transcript-box">
+                <%
+                let messages = [];
+                try { messages = JSON.parse(transcript.messages_json); } catch(e) {}
+                messages.forEach(m => {
+                %>
+                <div class="message <%= m.author?.bot ? 'bot' : 'user' %>">
+                    <div class="message-header">
+                        <strong><%= m.author?.username || 'Unknown' %></strong>
+                        <span class="time"><%= new Date(m.timestamp || m.createdAt).toLocaleString() %></span>
+                    </div>
+                    <div class="message-content"><%= m.content || '' %></div>
+                </div>
+                <% }) %>
+            </div>
+            <% } else { %>
+            <p style="color: #888; text-align: center; padding: 20px;">No transcript available</p>
+            <% } %>
+        </div>
+    </div>
+
+    <!-- Ticket Logs -->
+    <div class="card">
+        <div class="card-title">📋 Event Log</div>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Event</th>
+                        <th>Details</th>
+                        <th>Staff</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% if (!logs || logs.length === 0) { %>
+                    <tr><td colspan="4" style="text-align:center; color:#888;">No events logged</td></tr>
+                    <% } %>
+                    <% (logs || []).forEach(log => { %>
+                    <tr>
+                        <td><%= new Date(log.created_at).toLocaleString() %></td>
+                        <td><span class="badge badge-<%= log.event_type === 'closed' ? 'closed' : log.event_type === 'created' ? 'open' : 'pending' %>"><%= log.event_type %></span></td>
+                        <td><%= log.details || '-' %></td>
+                        <td><%= log.staff_name || 'System' %></td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+@media (max-width: 1000px) { .row-2 { grid-template-columns: 1fr; } }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+.detail-item { display: flex; flex-direction: column; gap: 4px; }
+.detail-label { font-size: 0.8rem; color: #888; text-transform: uppercase; }
+.transcript-box { max-height: 400px; overflow-y: auto; background: #0a0a0f; border-radius: 6px; padding: 15px; }
+.message { margin-bottom: 12px; padding: 10px; border-radius: 6px; background: #16213e; }
+.message.bot { border-left: 3px solid #e94560; }
+.message.user { border-left: 3px solid #66c0f4; }
+.message-header { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.85rem; }
+.message-header .time { color: #666; }
+.message-content { color: #ccc; word-wrap: break-word; white-space: pre-wrap; }
+</style>
+
+<script>
+function closeTicket() {
+    const reason = prompt('Enter close reason:');
+    if (reason === null) return;
+    
+    fetch('/dashboard/tickets/<%= ticket.id %>/close', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: reason || 'Closed from dashboard' })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Failed: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => alert('Error: ' + err.message));
+}
+</script>
+
+<%- include('_layout-end') %>

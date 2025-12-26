@@ -1,0 +1,68 @@
+<%- include('_layout-start') %>
+
+<div class="content-header">
+    <h2><%= game ? '✏️ Edit' : '➕ Add' %> Ubisoft Game</h2>
+    <a href="/dashboard/ubisoft/games" class="btn btn-secondary">← Back</a>
+</div>
+
+<div class="content-body">
+    <div class="card" style="max-width: 600px;">
+        <form method="POST" action="/dashboard/ubisoft/games/<%= game ? game.id + '/edit' : 'add' %>">
+            <div class="form-group">
+                <label>Game ID</label>
+                <input type="text" name="game_id" class="form-control" value="<%= game?.game_id || '' %>" required placeholder="e.g., assassins-creed-valhalla">
+            </div>
+            
+            <div class="form-group">
+                <label>Game Name</label>
+                <input type="text" name="game_name" class="form-control" value="<%= game?.game_name || '' %>" required placeholder="e.g., Assassin's Creed Valhalla">
+            </div>
+            
+            <div class="form-group">
+                <label>Folder Name</label>
+                <input type="text" name="folder_name" class="form-control" value="<%= game?.folder_name || '' %>" placeholder="e.g., AC Valhalla">
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Size (GB)</label>
+                    <input type="number" name="size_gb" class="form-control" value="<%= game?.size_gb || 0 %>" step="0.1" min="0">
+                </div>
+                <div class="form-group">
+                    <label>Demand Type</label>
+                    <select name="demand_type" class="form-control">
+                        <option value="normal" <%= game?.demand_type === 'normal' ? 'selected' : '' %>>Normal</option>
+                        <option value="high" <%= game?.demand_type === 'high' ? 'selected' : '' %>>High Demand</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="free_panel" value="1" <%= game?.free_panel ? 'checked' : '' %>>
+                        Free Panel Game
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="hidden" value="1" <%= game?.hidden ? 'checked' : '' %>>
+                        Hidden
+                    </label>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <button type="submit" class="btn btn-primary"><%= game ? '💾 Save Changes' : '➕ Add Game' %></button>
+                <a href="/dashboard/ubisoft/games" class="btn btn-secondary" style="margin-left: 10px;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.checkbox-label { display: flex; align-items: center; gap: 8px; cursor: pointer; color: #fff; }
+.checkbox-label input { width: 18px; height: 18px; }
+</style>
+
+<%- include('_layout-end') %>

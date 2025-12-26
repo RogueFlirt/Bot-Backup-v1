@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
+        .dashboard-container { display: flex; min-height: 100vh; }
+        .sidebar { width: 260px; background: linear-gradient(180deg, #12121a 0%, #0d0d14 100%); border-right: 1px solid #1a1a2e; position: fixed; height: 100vh; overflow-y: auto; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #1a1a2e; display: flex; align-items: center; gap: 12px; }
+        .sidebar-header h1 { font-size: 1.1rem; color: #e94560; }
+        .sidebar-nav { padding: 15px 0; }
+        .nav-section { padding: 8px 20px; font-size: 11px; text-transform: uppercase; color: #666; font-weight: 600; margin-top: 10px; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #888; text-decoration: none; border-left: 3px solid transparent; }
+        .nav-item:hover { background: rgba(233, 69, 96, 0.1); color: #fff; }
+        .nav-item.active { background: rgba(233, 69, 96, 0.15); color: #e94560; border-left-color: #e94560; }
+        .nav-divider { height: 1px; background: #1a1a2e; margin: 10px 20px; }
+        .sidebar-footer { padding: 15px 20px; border-top: 1px solid #1a1a2e; position: absolute; bottom: 0; width: 100%; background: #0d0d14; }
+        .logout-btn { display: block; text-align: center; padding: 8px; background: rgba(220, 53, 69, 0.2); color: #dc3545; text-decoration: none; border-radius: 5px; margin-top: 10px; }
+        .main-content { flex: 1; margin-left: 260px; }
+        .content-header { padding: 20px 30px; background: #12121a; border-bottom: 1px solid #1a1a2e; }
+        .content-body { padding: 25px 30px; max-width: 600px; }
+        .card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 25px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: #ccc; font-weight: 500; }
+        .form-control { width: 100%; padding: 12px 15px; border: 1px solid #0f3460; border-radius: 6px; background: #1a1a2e; color: #fff; font-size: 1rem; }
+        .form-control:focus { outline: none; border-color: #e94560; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .checkbox-group { display: flex; align-items: center; gap: 10px; }
+        .checkbox-group input { width: 18px; height: 18px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.95rem; text-decoration: none; }
+        .btn-primary { background: #e94560; color: #fff; }
+        .btn-secondary { background: #0f3460; color: #fff; }
+        .btn-group { display: flex; gap: 10px; margin-top: 25px; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header"><span style="font-size:2rem">🍺</span><h1>Pub's Lounge</h1></div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span>📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/tickets" class="nav-item"><span>🎫</span><span>Live Tickets</span></a>
+                <div class="nav-section">🎮 Steam</div>
+                <a href="/dashboard/steam/games" class="nav-item active"><span>🎮</span><span>Games</span></a>
+                <a href="/dashboard/steam/accounts" class="nav-item"><span>👤</span><span>Accounts</span></a>
+                <a href="/dashboard/steam/tokens" class="nav-item"><span>🎫</span><span>Tokens</span></a>
+                <div class="nav-section">🎯 Ubisoft</div>
+                <a href="/dashboard/ubisoft/games" class="nav-item"><span>🎮</span><span>Games</span></a>
+                <div class="nav-section">🔴 EA</div>
+                <a href="/dashboard/ea/games" class="nav-item"><span>🎮</span><span>Games</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item"><span>📈</span><span>Analytics</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer">
+                <div><%= user.username %></div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h2><%= game ? 'Edit' : 'Add' %> Steam Game</h2>
+            </header>
+            
+            <div class="content-body">
+                <div class="card">
+                    <form method="POST" action="/dashboard/steam/games/<%= game ? game.id + '/edit' : 'add' %>">
+                        <div class="form-group">
+                            <label>Game ID (slug)</label>
+                            <input type="text" name="game_id" class="form-control" required value="<%= game?.game_id || '' %>" placeholder="e.g. doom_the_dark_ages">
+                        </div>
+                        <div class="form-group">
+                            <label>Game Name</label>
+                            <input type="text" name="game_name" class="form-control" required value="<%= game?.game_name || '' %>" placeholder="e.g. DOOM: The Dark Ages">
+                        </div>
+                        <div class="form-group">
+                            <label>Folder Name</label>
+                            <input type="text" name="folder_name" class="form-control" value="<%= game?.folder_name || '' %>" placeholder="Optional">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Size (GB)</label>
+                                <input type="number" name="size_gb" class="form-control" step="0.1" value="<%= game?.size_gb || 0 %>">
+                            </div>
+                            <div class="form-group">
+                                <label>Demand Type</label>
+                                <select name="demand_type" class="form-control">
+                                    <option value="normal" <%= game?.demand_type !== 'high' ? 'selected' : '' %>>Normal</option>
+                                    <option value="high" <%= game?.demand_type === 'high' ? 'selected' : '' %>>High Demand</option>
+                                </select>
+                            </div>
+                        </div>
+                        <% if (game) { %>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <div class="checkbox-group">
+                                    <input type="checkbox" name="free_panel" id="free_panel" <%= game?.free_panel ? 'checked' : '' %>>
+                                    <label for="free_panel">Show on Free Panel</label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="checkbox-group">
+                                    <input type="checkbox" name="hidden" id="hidden" <%= game?.hidden ? 'checked' : '' %>>
+                                    <label for="hidden">Hidden</label>
+                                </div>
+                            </div>
+                        </div>
+                        <% } %>
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary"><%= game ? 'Save Changes' : 'Add Game' %></button>
+                            <a href="/dashboard/steam/games" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

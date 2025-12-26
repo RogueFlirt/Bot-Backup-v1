@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= staffMember.username %> - Staff Activity</title>
+    <link rel="stylesheet" href="/dashboard/static/css/dashboard.css">
+    <style>
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #4da8da;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .staff-profile {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid #0f3460;
+        }
+        
+        .profile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .profile-name {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .profile-id {
+            color: #888;
+            font-size: 0.85rem;
+            font-family: monospace;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-box {
+            background: #0f3460;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #4da8da;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        .stat-box.approved .stat-value { color: #2ecc71; }
+        .stat-box.rejected .stat-value { color: #e74c3c; }
+        .stat-box.generations .stat-value { color: #9b59b6; }
+        .stat-box.cooldowns .stat-value { color: #f39c12; }
+        .stat-box.closes .stat-value { color: #e67e22; }
+        .stat-box.help .stat-value { color: #3498db; }
+        
+        .activity-log {
+            background: #16213e;
+            border-radius: 12px;
+            border: 1px solid #0f3460;
+            overflow: hidden;
+        }
+        
+        .log-header {
+            background: #0f3460;
+            padding: 15px 20px;
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .log-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .log-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 12px 20px;
+            border-bottom: 1px solid #0f3460;
+            gap: 15px;
+        }
+        
+        .log-item:last-child {
+            border-bottom: none;
+        }
+        
+        .log-time {
+            color: #888;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            min-width: 140px;
+        }
+        
+        .log-badge {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            min-width: 80px;
+            text-align: center;
+        }
+        
+        .log-badge.staff_action { background: #2ecc71; color: #fff; }
+        .log-badge.closed { background: #e67e22; color: #fff; }
+        .log-badge.generate { background: #9b59b6; color: #fff; }
+        .log-badge.cooldown { background: #f39c12; color: #fff; }
+        .log-badge.applied { background: #f39c12; color: #fff; }
+        .log-badge.removed { background: #3498db; color: #fff; }
+        .log-badge.login { background: #3498db; color: #fff; }
+        .log-badge.default { background: #555; color: #fff; }
+        
+        .log-content {
+            flex: 1;
+        }
+        
+        .log-target {
+            color: #fff;
+            font-weight: 500;
+        }
+        
+        .log-details {
+            color: #888;
+            font-size: 0.85rem;
+            margin-top: 3px;
+        }
+        
+        .log-game {
+            color: #4da8da;
+            font-size: 0.85rem;
+        }
+        
+        .empty-log {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        
+        .period-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .period-btn {
+            padding: 8px 16px;
+            background: #0f3460;
+            color: #888;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        
+        .period-btn.active, .period-btn:hover {
+            background: #4da8da;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo">🍺</span>
+                <h1>Pub's Lounge</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/games" class="nav-item"><span class="nav-icon">🎮</span><span>Games</span></a>
+                <a href="/dashboard/accounts" class="nav-item"><span class="nav-icon">👤</span><span>Accounts</span></a>
+                <a href="/dashboard/tokens" class="nav-item"><span class="nav-icon">🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/transcripts" class="nav-item"><span class="nav-icon">📜</span><span>Transcripts</span></a>
+                <div class="nav-divider"></div>
+                <div class="nav-section-title" style="padding: 8px 16px; font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px;">🎯 Ubisoft</div>
+                <a href="/dashboard/ubisoft-games" class="nav-item">
+                    <span class="nav-icon">🎮</span>
+                    <span>Ubisoft Games</span>
+                </a>
+                <a href="/dashboard/ubisoft-accounts" class="nav-item">
+                    <span class="nav-icon">👤</span>
+                    <span>Ubisoft Accounts</span>
+                </a>
+                <a href="/dashboard/ubisoft-tokens" class="nav-item">
+                    <span class="nav-icon">🎫</span>
+                    <span>Ubisoft Tokens</span>
+                </a>
+                <a href="/dashboard/ubisoft-activations" class="nav-item">
+                    <span class="nav-icon">✅</span>
+                    <span>Ubisoft Activations</span>
+                </a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item"><span class="nav-icon">📈</span><span>Analytics</span></a>
+                <a href="/dashboard/activations" class="nav-item"><span class="nav-icon">✅</span><span>Activated Users</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/generate" class="nav-item"><span class="nav-icon">⚡</span><span>Generate Token</span></a>
+                <a href="/dashboard/ticket-logs" class="nav-item"><span class="nav-icon">🎫</span><span>Ticket Logs</span></a>
+                <a href="/dashboard/audit-logs" class="nav-item"><span class="nav-icon">📋</span><span>Audit Logs</span></a>
+                <a href="/dashboard/staff-activity" class="nav-item active"><span class="nav-icon">⏳</span><span>Staff Activity</span></a>
+                <a href="/dashboard/macros" class="nav-item"><span class="nav-icon">📝</span><span>Macros</span></a>
+                <a href="/dashboard/files" class="nav-item"><span class="nav-icon">📁</span><span>File Manager</span></a>
+                <a href="/dashboard/users" class="nav-item"><span class="nav-icon">👥</span><span>Users</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="" class="user-avatar" onerror="this.style.display='none'">
+                    <div class="user-details">
+                        <span class="user-name"><%= user.username %></span>
+                        <span class="user-role">Staff</span>
+                    </div>
+                </div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <div class="content-wrapper">
+                <a href="/dashboard/staff-activity?days=<%= days %>" class="back-link">← Back to Staff Activity</a>
+                
+                <!-- Staff Profile -->
+                <div class="staff-profile">
+                    <div class="profile-header">
+                        <div>
+                            <div class="profile-name">👤 <%= staffMember.username %></div>
+                            <div class="profile-id">ID: <%= staffMember.user_id %></div>
+                        </div>
+                        <div class="period-selector">
+                            <a href="?days=7" class="period-btn <%= days === 7 ? 'active' : '' %>">7d</a>
+                            <a href="?days=14" class="period-btn <%= days === 14 ? 'active' : '' %>">14d</a>
+                            <a href="?days=30" class="period-btn <%= days === 30 ? 'active' : '' %>">30d</a>
+                            <a href="?days=90" class="period-btn <%= days === 90 ? 'active' : '' %>">90d</a>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-value"><%= staffMember.total_actions %></div>
+                            <div class="stat-label">Total Actions</div>
+                        </div>
+                        <div class="stat-box approved">
+                            <div class="stat-value"><%= staffMember.verifications_approved || 0 %></div>
+                            <div class="stat-label">✅ Approved</div>
+                        </div>
+                        <div class="stat-box rejected">
+                            <div class="stat-value"><%= staffMember.verifications_rejected || 0 %></div>
+                            <div class="stat-label">❌ Rejected</div>
+                        </div>
+                        <div class="stat-box generations">
+                            <div class="stat-value"><%= staffMember.manual_generations || 0 %></div>
+                            <div class="stat-label">⚡ Manual Gens</div>
+                        </div>
+                        <div class="stat-box cooldowns">
+                            <div class="stat-value"><%= staffMember.cooldowns_applied || 0 %></div>
+                            <div class="stat-label">⏰ CDs Applied</div>
+                        </div>
+                        <div class="stat-box closes">
+                            <div class="stat-value"><%= staffMember.manual_closes || 0 %></div>
+                            <div class="stat-label">🚪 Manual Closes</div>
+                        </div>
+                        <div class="stat-box help">
+                            <div class="stat-value"><%= staffMember.help_responses || 0 %></div>
+                            <div class="stat-label">🆘 Help Given</div>
+                        </div>
+                        <% if (staffMember.avg_duration && staffMember.avg_duration > 0) { %>
+                        <div class="stat-box">
+                            <div class="stat-value"><%= Math.round(staffMember.avg_duration) %></div>
+                            <div class="stat-label">⏱️ Avg Duration (min)</div>
+                        </div>
+                        <% } %>
+                    </div>
+                </div>
+                
+                <!-- Activity Log -->
+                <div class="activity-log">
+                    <div class="log-header">📋 Recent Activity (Last <%= days %> days)</div>
+                    <div class="log-list">
+                        <% if (details && details.length > 0) { %>
+                            <% details.forEach(action => { %>
+                            <div class="log-item">
+                                <div class="log-time"><%= new Date(action.created_at).toLocaleString() %></div>
+                                <span class="log-badge <%= action.event_type ? action.event_type.toLowerCase().replace(/[^a-z]/g, '_') : 'default' %>">
+                                    <%= action.event_type || 'action' %>
+                                </span>
+                                <div class="log-content">
+                                    <% if (action.target_user) { %>
+                                    <div class="log-target">User: <%= action.target_user %></div>
+                                    <% } %>
+                                    <% if (action.game_name) { %>
+                                    <div class="log-game">🎮 <%= action.game_name %></div>
+                                    <% } %>
+                                    <% if (action.event_details) { %>
+                                    <div class="log-details">
+                                        <% 
+                                        let details = action.event_details;
+                                        try {
+                                            const parsed = JSON.parse(details);
+                                            details = Object.entries(parsed).map(([k,v]) => `${k}: ${v}`).join(', ');
+                                        } catch(e) {}
+                                        %>
+                                        <%= details.substring(0, 150) %><%= details.length > 150 ? '...' : '' %>
+                                    </div>
+                                    <% } %>
+                                    <% if (action.duration_minutes) { %>
+                                    <div class="log-details">Duration: <%= action.duration_minutes %> min</div>
+                                    <% } %>
+                                </div>
+                            </div>
+                            <% }); %>
+                        <% } else { %>
+                        <div class="empty-log">
+                            <p>No activity recorded in the last <%= days %> days.</p>
+                        </div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

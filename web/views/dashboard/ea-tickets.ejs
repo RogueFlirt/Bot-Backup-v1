@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <link rel="stylesheet" href="/dashboard/static/css/dashboard.css">
+    <style>
+        .nav-section-title { padding: 12px 20px 6px; font-size: 11px; text-transform: uppercase; color: #666; font-weight: 600; }
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 15px; text-align: center; }
+        .stat-value { font-size: 1.8rem; font-weight: bold; }
+        .stat-label { color: #888; font-size: 0.85rem; }
+        .stat-pending .stat-value { color: #ffc107; }
+        .stat-processing .stat-value { color: #17a2b8; }
+        .stat-completed .stat-value { color: #28a745; }
+        .stat-failed .stat-value { color: #dc3545; }
+        .filter-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .filter-tab { padding: 8px 16px; border-radius: 5px; text-decoration: none; color: #888; background: #0f3460; }
+        .filter-tab.active, .filter-tab:hover { background: #e94560; color: #fff; }
+        .card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 12px; text-align: left; border-bottom: 1px solid #0f3460; }
+        .table th { background: #0f3460; }
+        .table tr:hover { background: rgba(233, 69, 96, 0.1); }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-pending { background: #ffc107; color: #000; }
+        .badge-processing { background: #17a2b8; color: #fff; }
+        .badge-completed { background: #28a745; color: #fff; }
+        .badge-failed { background: #dc3545; color: #fff; }
+        .badge-closed { background: #6c757d; color: #fff; }
+        .btn { padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 0.85rem; }
+        .btn-sm { padding: 4px 8px; font-size: 0.75rem; }
+        .btn-primary { background: #e94560; color: #fff; }
+        .btn-secondary { background: #0f3460; color: #fff; }
+        .btn-danger { background: #dc3545; color: #fff; }
+        .empty-state { text-align: center; padding: 40px; color: #666; }
+        .header-actions { display: flex; gap: 10px; }
+        @media (max-width: 768px) { .stats-row { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header"><span class="logo">🍺</span><h1>Pub's Lounge</h1></div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/games" class="nav-item"><span class="nav-icon">🎮</span><span>Games</span></a>
+                <a href="/dashboard/accounts" class="nav-item"><span class="nav-icon">👤</span><span>Accounts</span></a>
+                <a href="/dashboard/tokens" class="nav-item"><span class="nav-icon">🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/transcripts" class="nav-item"><span class="nav-icon">📜</span><span>Transcripts</span></a>
+                <div class="nav-divider"></div>
+                <div class="nav-section-title">🔴 EA</div>
+                <a href="/dashboard/ea" class="nav-item"><span class="nav-icon">🎮</span><span>EA Games</span></a>
+                <a href="/dashboard/ea/tickets" class="nav-item active"><span class="nav-icon">🎫</span><span>EA Tickets</span></a>
+                <a href="/dashboard/ea/cooldowns" class="nav-item"><span class="nav-icon">⏱️</span><span>EA Cooldowns</span></a>
+                <a href="/dashboard/ea/transcripts" class="nav-item"><span class="nav-icon">📜</span><span>EA Transcripts</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item"><span class="nav-icon">📈</span><span>Analytics</span></a>
+                <a href="/dashboard/audit-logs" class="nav-item"><span class="nav-icon">📋</span><span>Audit Logs</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="" class="user-avatar" onerror="this.style.display='none'">
+                    <div class="user-details"><span class="user-name"><%= user.username %></span><span class="user-role">Staff</span></div>
+                </div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h2><%= title %></h2>
+                <div class="header-actions">
+                    <a href="/dashboard/ea" class="btn btn-secondary">← Back to EA Games</a>
+                    <form action="/dashboard/ea/tickets/clear" method="POST" style="display:inline" onsubmit="return confirm('Clear all completed/closed tickets?')">
+                        <button type="submit" class="btn btn-danger">Clear History</button>
+                    </form>
+                </div>
+            </header>
+            
+            <div class="content-body">
+                <div class="stats-row">
+                    <div class="stat-card stat-pending"><div class="stat-value"><%= stats.pending %></div><div class="stat-label">Pending</div></div>
+                    <div class="stat-card stat-processing"><div class="stat-value"><%= stats.processing %></div><div class="stat-label">Processing</div></div>
+                    <div class="stat-card stat-completed"><div class="stat-value"><%= stats.completed %></div><div class="stat-label">Completed</div></div>
+                    <div class="stat-card stat-failed"><div class="stat-value"><%= stats.failed %></div><div class="stat-label">Failed</div></div>
+                </div>
+                
+                <div class="filter-tabs">
+                    <a href="/dashboard/ea/tickets?status=all" class="filter-tab <%= currentStatus === 'all' ? 'active' : '' %>">All</a>
+                    <a href="/dashboard/ea/tickets?status=pending" class="filter-tab <%= currentStatus === 'pending' ? 'active' : '' %>">Pending</a>
+                    <a href="/dashboard/ea/tickets?status=processing" class="filter-tab <%= currentStatus === 'processing' ? 'active' : '' %>">Processing</a>
+                    <a href="/dashboard/ea/tickets?status=completed" class="filter-tab <%= currentStatus === 'completed' ? 'active' : '' %>">Completed</a>
+                    <a href="/dashboard/ea/tickets?status=failed" class="filter-tab <%= currentStatus === 'failed' ? 'active' : '' %>">Failed</a>
+                </div>
+                
+                <div class="card">
+                    <% if (tickets && tickets.length > 0) { %>
+                        <table class="table">
+                            <thead><tr><th>Ticket ID</th><th>User</th><th>Game</th><th>Status</th><th>Retries</th><th>Created</th><th>Actions</th></tr></thead>
+                            <tbody>
+                                <% for (const ticket of tickets) { %>
+                                    <tr>
+                                        <td><code><%= ticket.ticket_id %></code></td>
+                                        <td><%= ticket.username || ticket.user_id %></td>
+                                        <td><%= ticket.game_name || ticket.game_title || '-' %></td>
+                                        <td><span class="badge badge-<%= ticket.status %>"><%= ticket.status %></span></td>
+                                        <td><%= ticket.retry_count || 0 %></td>
+                                        <td><%= new Date(ticket.created_at).toLocaleString() %></td>
+                                        <td><a href="/dashboard/ea/tickets/<%= ticket.id %>" class="btn btn-secondary btn-sm">View</a></td>
+                                    </tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                    <% } else { %>
+                        <div class="empty-state"><p>No tickets found.</p></div>
+                    <% } %>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

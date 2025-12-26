@@ -1,0 +1,134 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">⚡</span>
+        Generate Steam Tokens
+    </h1>
+</div>
+
+<% if (result) { %>
+<div class="alert alert-<%= result.success ? 'success' : 'danger' %>">
+    <%= result.success ? '✅' : '❌' %> <%= result.message %>
+</div>
+<% } %>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Token Generator</span>
+    </div>
+    
+    <form method="POST" action="/dashboard/steam/generate">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Game</label>
+                <select name="game_id" id="gameSelect" class="form-control" required onchange="updateAccounts()">
+                    <option value="">Select Game...</option>
+                    <% games.forEach(g => { %>
+                    <option value="<%= g.id %>"><%= g.game_name %></option>
+                    <% }); %>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Account <span id="accountCount" style="color: var(--text-muted);"></span></label>
+                <select name="account_id" id="accountSelect" class="form-control" required>
+                    <option value="">Select Game First...</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Steam ID <span style="color: var(--text-muted);">(Optional - for refills only)</span></label>
+            <input type="text" name="steam_id" class="form-control" placeholder="Enter Steam ID for refill...">
+        </div>
+        
+        <button type="submit" class="btn btn-primary">⚡ Generate Token</button>
+    </form>
+</div>
+
+<script>
+const tokensByGameAccount = <%- JSON.stringify(tokensByGameAccount || {}) %>;
+const accounts = <%- JSON.stringify(accounts || []) %>;
+
+// Debug - log to console
+console.log('tokensByGameAccount:', tokensByGameAccount);
+console.log('accounts:', accounts);
+
+function updateAccounts() {
+    const gameId = document.getElementById('gameSelect').value;
+    const accountSelect = document.getElementById('accountSelect');
+    const accountCount = document.getElementById('accountCount');
+    
+    accountSelect.innerHTML = '';
+    
+    if (!gameId) {
+        accountSelect.innerHTML = '<option value="">Select Game First...</option>';
+        accountCount.textContent = '';
+        return;
+    }
+    
+    const gameTokens = tokensByGameAccount[gameId] || {};
+    console.log('gameId:', gameId, 'gameTokens:', gameTokens);
+    
+    // Sort accounts: those with available tokens first
+    const sortedAccounts = [...accounts].sort((a, b) => {
+        const aCount = gameTokens[a.id] || 0;
+        const bCount = gameTokens[b.id] || 0;
+        return bCount - aCount;
+    });
+    
+    let availableCount = 0;
+    let totalAvailable = 0;
+    
+    sortedAccounts.forEach(a => {
+        const count = gameTokens[a.id] || 0;
+        totalAvailable += count;
+        if (count > 0) availableCount++;
+    });
+    
+    // Add "Select Account" option
+    const defaultOpt = document.createElement('option');
+    defaultOpt.value = '';
+    defaultOpt.textContent = 'Select Account...';
+    accountSelect.appendChild(defaultOpt);
+    
+    // Always add "Any Available" option
+    const anyOpt = document.createElement('option');
+    anyOpt.value = 'any';
+    if (totalAvailable > 0) {
+        anyOpt.textContent = `🎲 Any Available (${totalAvailable} total tokens)`;
+        anyOpt.style.color = '#5865F2';
+    } else {
+        anyOpt.textContent = `🎲 Any Available (auto-select account)`;
+        anyOpt.style.color = '#5865F2';
+    }
+    accountSelect.appendChild(anyOpt);
+    
+    // Add individual accounts
+    sortedAccounts.forEach(a => {
+        const count = gameTokens[a.id] || 0;
+        
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        
+        const accountLabel = a.account_number ? `#${a.account_number} - ${a.account_name || 'Unknown'}` : (a.account_name || 'Unknown');
+        
+        if (count > 0) {
+            opt.textContent = `✅ ${accountLabel} (${count} available)`;
+            opt.style.color = '#23a559';
+        } else {
+            opt.textContent = `${accountLabel}`;
+        }
+        
+        accountSelect.appendChild(opt);
+    });
+    
+    if (totalAvailable > 0) {
+        accountCount.textContent = `(${availableCount} accounts with tokens, ${totalAvailable} total)`;
+    } else {
+        accountCount.textContent = '';
+    }
+}
+</script>
+
+<%- include('../partials/footer') %>

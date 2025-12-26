@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= typeof editUser !== 'undefined' && editUser ? 'Edit' : 'Add' %> User - Dashboard</title>
+    <link rel="stylesheet" href="/dashboard/static/css/dashboard.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #fff; margin: 0; }
+        .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+        h1 { margin-bottom: 30px; }
+        .form-card { background: rgba(255,255,255,0.05); border-radius: 12px; padding: 30px; }
+        .form-group { margin-bottom: 24px; }
+        .form-group label { display: block; color: #ccc; margin-bottom: 8px; font-size: 14px; font-weight: 500; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 12px 14px; background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #5865f2; background: rgba(255,255,255,0.15); }
+        .form-group input:disabled { background: rgba(255,255,255,0.05); color: #888; }
+        .form-group small { color: #888; font-size: 12px; margin-top: 6px; display: block; }
+        .checkbox-group { display: flex; align-items: center; gap: 10px; }
+        .checkbox-group input[type="checkbox"] { width: 18px; height: 18px; }
+        .btn-row { display: flex; gap: 12px; margin-top: 30px; }
+        .btn { padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; text-decoration: none; display: inline-block; text-align: center; }
+        .btn-primary { background: #5865f2; color: #fff; }
+        .btn-primary:hover { background: #4752c4; }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><%= typeof editUser !== 'undefined' && editUser ? '✏️ Edit' : '➕ Add' %> User</h1>
+        
+        <div class="form-card">
+            <form method="POST" action="<%= typeof action !== 'undefined' ? action : '/dashboard/users/add' %>">
+                <div class="form-group">
+                    <label>Username</label>
+                    <% if (typeof editUser !== 'undefined' && editUser) { %>
+                        <input type="text" value="<%= editUser.username %>" disabled>
+                        <small>Username cannot be changed</small>
+                    <% } else { %>
+                        <input type="text" name="username" required placeholder="username" autocomplete="off">
+                        <small>Lowercase letters and numbers only</small>
+                    <% } %>
+                </div>
+                
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" <%= typeof editUser === 'undefined' || !editUser ? 'required' : '' %> placeholder="<%= typeof editUser !== 'undefined' && editUser ? 'Leave blank to keep current' : 'Enter password' %>" autocomplete="new-password">
+                    <% if (typeof editUser !== 'undefined' && editUser) { %><small>Leave blank to keep current password</small><% } %>
+                </div>
+                
+                <div class="form-group">
+                    <label>Display Name</label>
+                    <input type="text" name="display_name" value="<%= typeof editUser !== 'undefined' && editUser && editUser.display_name ? editUser.display_name : '' %>" placeholder="Display Name">
+                </div>
+                
+                <div class="form-group">
+                    <label>Role</label>
+                    <select name="role">
+                        <option value="bartender" <%= typeof editUser !== 'undefined' && editUser && editUser.role === 'bartender' ? 'selected' : '' %>>Bartender - Token generation only</option>
+                        <option value="staff" <%= typeof editUser !== 'undefined' && editUser && editUser.role === 'staff' ? 'selected' : '' %>>Staff - Full dashboard access</option>
+                        <option value="admin" <%= typeof editUser !== 'undefined' && editUser && editUser.role === 'admin' ? 'selected' : '' %>>Admin - Can manage users</option>
+                    </select>
+                    <small>Bartenders can only generate tokens. Staff have full dashboard access. Admins can manage users.</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Discord User ID (optional)</label>
+                    <input type="text" name="discord_id" value="<%= typeof editUser !== 'undefined' && editUser && editUser.discord_id ? editUser.discord_id : '' %>" placeholder="123456789012345678">
+                    <small>For reference only - not used for login</small>
+                </div>
+                
+                <% if (typeof editUser !== 'undefined' && editUser) { %>
+                <div class="form-group">
+                    <div class="checkbox-group">
+                        <input type="checkbox" name="is_active" id="is_active" <%= editUser.is_active ? 'checked' : '' %>>
+                        <label for="is_active" style="margin-bottom: 0; cursor: pointer;">Active Account</label>
+                    </div>
+                    <small>Inactive users cannot login</small>
+                </div>
+                <% } %>
+                
+                <div class="btn-row">
+                    <button type="submit" class="btn btn-primary"><%= typeof editUser !== 'undefined' && editUser ? 'Update' : 'Create' %> User</button>
+                    <a href="/dashboard/users" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

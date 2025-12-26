@@ -1,0 +1,154 @@
+<%- include('_layout-start') %>
+
+<div class="content-header">
+    <h2>👥 User Management</h2>
+    <button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('active')">➕ Add User</button>
+</div>
+
+<div class="content-body">
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Last Login</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% (users || []).forEach(u => { %>
+                    <tr>
+                        <td><strong><%= u.username %></strong></td>
+                        <td>
+                            <span class="badge badge-<%= u.role === 'admin' ? 'ea' : u.role === 'staff' ? 'ubisoft' : 'steam' %>"><%= u.role %></span>
+                        </td>
+                        <td><%= u.last_login ? new Date(u.last_login).toLocaleString() : 'Never' %></td>
+                        <td><%= new Date(u.created_at).toLocaleDateString() %></td>
+                        <td>
+                            <button class="btn btn-sm btn-secondary" onclick="editUser(<%= JSON.stringify(u).replace(/"/g, '&quot;') %>)">Edit</button>
+                            <% if (u.id !== user.id) { %>
+                            <form method="POST" action="/dashboard/users/<%= u.id %>/delete" style="display:inline" onsubmit="return confirm('Delete this user?')">
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            </form>
+                            <% } %>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+        <div class="card-title">🔑 Role Permissions</div>
+        <div class="role-grid">
+            <div class="role-item">
+                <h4><span class="badge badge-ea">Admin</span></h4>
+                <ul>
+                    <li>Full dashboard access</li>
+                    <li>User management</li>
+                    <li>Audit log access</li>
+                    <li>All staff permissions</li>
+                </ul>
+            </div>
+            <div class="role-item">
+                <h4><span class="badge badge-ubisoft">Staff</span></h4>
+                <ul>
+                    <li>Ticket management</li>
+                    <li>Game/Account management</li>
+                    <li>Token generation</li>
+                    <li>Analytics access</li>
+                </ul>
+            </div>
+            <div class="role-item">
+                <h4><span class="badge badge-steam">Bartender</span></h4>
+                <ul>
+                    <li>Steam token generation only</li>
+                    <li>Limited dashboard access</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Modal -->
+<div id="addModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>➕ Add User</h3>
+            <button class="modal-close" onclick="document.getElementById('addModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST" action="/dashboard/users/add">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" name="username" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" class="form-control" required minlength="6">
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <select name="role" class="form-control">
+                    <option value="staff">Staff</option>
+                    <option value="bartender">Bartender</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Add User</button>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>✏️ Edit User</h3>
+            <button class="modal-close" onclick="document.getElementById('editModal').classList.remove('active')">&times;</button>
+        </div>
+        <form method="POST" id="editForm">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" name="username" id="edit_username" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>New Password (leave blank to keep)</label>
+                <input type="password" name="password" id="edit_password" class="form-control" minlength="6">
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <select name="role" id="edit_role" class="form-control">
+                    <option value="staff">Staff</option>
+                    <option value="bartender">Bartender</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </form>
+    </div>
+</div>
+
+<style>
+.role-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+@media (max-width: 800px) { .role-grid { grid-template-columns: 1fr; } }
+.role-item { background: #1a1a2e; padding: 15px; border-radius: 8px; }
+.role-item h4 { margin-bottom: 10px; }
+.role-item ul { color: #888; padding-left: 20px; margin: 0; }
+.role-item li { margin: 5px 0; }
+</style>
+
+<script>
+function editUser(user) {
+    document.getElementById('editForm').action = '/dashboard/users/' + user.id + '/edit';
+    document.getElementById('edit_username').value = user.username || '';
+    document.getElementById('edit_password').value = '';
+    document.getElementById('edit_role').value = user.role || 'staff';
+    document.getElementById('editModal').classList.add('active');
+}
+</script>
+
+<%- include('_layout-end') %>

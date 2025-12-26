@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <link rel="stylesheet" href="/dashboard/static/css/dashboard.css">
+    <style>
+        .nav-section-title {
+            padding: 8px 16px;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .transcript-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .transcript-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .transcript-id {
+            font-family: monospace;
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+        .transcript-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+        .close-reason {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .close-reason.completed { background: rgba(35, 165, 89, 0.2); color: #23a559; }
+        .close-reason.staff_closed { background: rgba(88, 101, 242, 0.2); color: #5865f2; }
+        .close-reason.timeout { background: rgba(240, 178, 50, 0.2); color: #f0b232; }
+        .close-reason.error { background: rgba(220, 53, 69, 0.2); color: #dc3545; }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 20px;
+        }
+        .pagination a {
+            padding: 8px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+        .pagination a.active {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo">🍺</span>
+                <h1>Pub's Lounge</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/games" class="nav-item"><span class="nav-icon">🎮</span><span>Games</span></a>
+                <a href="/dashboard/accounts" class="nav-item"><span class="nav-icon">👤</span><span>Accounts</span></a>
+                <a href="/dashboard/tokens" class="nav-item"><span class="nav-icon">🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/transcripts" class="nav-item"><span class="nav-icon">📜</span><span>Transcripts</span></a>
+                <div class="nav-divider"></div>
+                <div class="nav-section-title">🎯 Ubisoft</div>
+                <a href="/dashboard/ubisoft-games" class="nav-item"><span class="nav-icon">🎮</span><span>Ubisoft Games</span></a>
+                <a href="/dashboard/ubisoft-accounts" class="nav-item"><span class="nav-icon">👤</span><span>Ubisoft Accounts</span></a>
+                <a href="/dashboard/ubisoft-tokens" class="nav-item"><span class="nav-icon">🎫</span><span>Ubisoft Tokens</span></a>
+                <a href="/dashboard/ubisoft-activations" class="nav-item"><span class="nav-icon">✅</span><span>Ubisoft Activations</span></a>
+                <a href="/dashboard/ubisoft-transcripts" class="nav-item active"><span class="nav-icon">📜</span><span>Ubisoft Transcripts</span></a>
+                <a href="/dashboard/ubisoft-generate" class="nav-item"><span class="nav-icon">⚡</span><span>Manual Generate</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item"><span class="nav-icon">📈</span><span>Analytics</span></a>
+                <a href="/dashboard/activations" class="nav-item"><span class="nav-icon">✅</span><span>Activated Users</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="" class="user-avatar" onerror="this.style.display='none'">
+                    <div class="user-details">
+                        <span class="user-name"><%= user.username %></span>
+                        <span class="user-role">Staff</span>
+                    </div>
+                </div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h2>🎯 <%= title %></h2>
+            </header>
+            
+            <div class="content-body">
+                <% if (transcripts && transcripts.length > 0) { %>
+                <div class="transcripts-list">
+                    <% transcripts.forEach(t => { %>
+                    <div class="transcript-card">
+                        <div class="transcript-header">
+                            <span class="transcript-id"><%= t.ticket_id %></span>
+                            <span class="close-reason <%= t.close_reason || 'completed' %>"><%= t.close_reason || 'completed' %></span>
+                        </div>
+                        <div class="transcript-details">
+                            <div><strong>User:</strong> <%= t.username || 'Unknown' %></div>
+                            <div><strong>Game:</strong> <%= t.game_name || 'N/A' %></div>
+                            <div><strong>Created:</strong> <%= t.created_at ? new Date(t.created_at).toLocaleString() : 'N/A' %></div>
+                            <div><strong>Closed:</strong> <%= t.closed_at ? new Date(t.closed_at).toLocaleString() : 'N/A' %></div>
+                        </div>
+                        <div style="margin-top: 12px;">
+                            <a href="/dashboard/ubisoft-transcripts/<%= t.ticket_id %>" class="btn btn-sm">View Details</a>
+                        </div>
+                    </div>
+                    <% }) %>
+                </div>
+                
+                <% if (pagination && pagination.totalPages > 1) { %>
+                <div class="pagination">
+                    <% for (let i = 1; i <= pagination.totalPages; i++) { %>
+                    <a href="?page=<%= i %>" class="<%= pagination.page === i ? 'active' : '' %>"><%= i %></a>
+                    <% } %>
+                </div>
+                <% } %>
+                <% } else { %>
+                <div class="empty-state">
+                    <p>No Ubisoft transcripts found.</p>
+                </div>
+                <% } %>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
