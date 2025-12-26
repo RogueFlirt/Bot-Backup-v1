@@ -1,0 +1,2487 @@
+// ============================================================================
+// 🎯 UBISOFT BOT V2.3.1 - STAFF-ONLY CLOSE, OVERRIDE, REDO
+// Flow: Screenshots → Instructions/Download → Token Request TXT → FIFO Queue → Token
+// Users CANNOT close tickets - staff only
+// NEW: /ubisoft-setstaffroles, /ubisoft-override, /ubisoft-redo
+// ============================================================================
+
+require('dotenv').config();
+const {
+    Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder,
+    ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType,
+    SlashCommandBuilder, REST, Routes, PermissionFlagsBits, AttachmentBuilder
+} = require('discord.js');
+const path = require('path');
+const fs = require('fs');
+const { spawn, exec } = require('child_process');
+const fetch = require('node-fetch');
+
+// ============================================================================
+// IMPORTS
+// ============================================================================
+
+const db = require('./database/db');
+
+// AI Verification
+let AIVerifier = null;
+let aiVerifier = null;
+try {
+    AIVerifier = require('./ai-verifier');
+    console.log('[Ubisoft] ✅ AI Verifier module loaded');
+} catch (e) {
+    console.log('[Ubisoft] ⚠️ AI Verifier not loaded:', e.message);
+}
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+const config = {
+    token: process.env.UBISOFT_BOT_TOKEN,
+    clientId: process.env.UBISOFT_CLIENT_ID,
+    guildId: process.env.UBISOFT_GUILD_ID || (process.env.GUILD_ID || '').split(',')[0].trim(),
+    ticketChannelId: process.env.UBISOFT_TICKET_CHANNEL_ID || process.env.FORUM_CHANNEL_ID,
+    reviewChannelId: process.env.UBISOFT_REVIEW_CHANNEL_ID || process.env.REVIEW_CHANNEL_ID,
+    staffRoleIds: (process.env.STAFF_ROLE_IDS || '').split(',').filter(Boolean),
+    denuvoExePath: process.env.DENUVO_EXE_PATH || path.join(__dirname, 'ubisoft', 'DenuvoTicket.exe'),
+    tokenOutputPath: process.env.DENUVO_TOKEN_PATH || path.join(__dirname, 'ubisoft', 'token'),
+    
+    // Timeouts
+    screenshotTimeout: 10 * 60 * 1000,      // 10 minutes for screenshots
+    tokenRequestTimeout: 30 * 60 * 1000,    // 30 minutes for token request txt
+    responseTimeout: 30 * 60 * 1000,        // 30 minutes to respond after token
+    
+    // AI Keys
+    geminiApiKey: process.env.GEMINI_API_KEY || null,
+    groqApiKey: process.env.GROQ_API_KEY || null,
+    cloudflareAccountId: process.env.CF_ACCOUNT_ID || null,
+    cloudflareToken: process.env.CF_API_TOKEN || null,
+    
+    // Server IDs for membership checks
+    mainServerId: process.env.MAIN_SERVER_ID || '1265271912037089312',
+    paidServerId: process.env.PAID_SERVER_ID || '1265025550485950634',
+    freeServerId: process.env.FREE_SERVER_ID || '1310909523715690536',
+};
+
+// Initialize AI Verifier
+if (AIVerifier) {
+    aiVerifier = new AIVerifier({
+        geminiApiKey: config.geminiApiKey,
+        groqApiKey: config.groqApiKey,
+        cloudflareAccountId: config.cloudflareAccountId,
+        cloudflareToken: config.cloudflareToken
+    });
+    
+    aiVerifier.setShouldSkipGemini(() => {
+        const ticketCount = activeUbisoftTickets.size;
+        if (ticketCount >= 10) {
+            console.log(`[Ubisoft AI] High load: ${ticketCount} tickets, skipping Gemini`);
+            return true;
+        }
+        return false;
+    });
+}
+
+// ============================================================================
+// DISCORD CLIENT
+// ============================================================================
+
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers
+    ],
+    partials: [Partials.Channel, Partials.Message]
+});
+
+// ============================================================================
+// STATE MANAGEMENT
+// ============================================================================
+
+const activeUbisoftTickets = new Map();
+const activeTimers = new Map();
+const ubisoftPanels = new Map();
+
+// FIFO Queue for token generation
+const tokenQueue = [];
+let isProcessingQueue = false;
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function generateTicketId() {
+    return `UBI-${Date.now().toString(36).toUpperCase()}`;
+}
+
+function ensureDirectories() {
+    const dirs = [path.dirname(config.denuvoExePath), config.tokenOutputPath];
+    dirs.forEach(dir => {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+            console.log('[Ubisoft] Created directory:', dir);
+        }
+    });
+}
+
+function getStaffMention(guildId) {
+    if (guildId) {
+        const serverRoles = db.getServerStaffRoles ? db.getServerStaffRoles(guildId) : [];
+        if (serverRoles.length > 0) return serverRoles.map(id => `<@&${id}>`).join(' ');
+    }
+    if (config.staffRoleIds.length > 0) return config.staffRoleIds.map(id => `<@&${id}>`).join(' ');
+    return '@here';
+}
+
+function isStaff(interaction) {
+    if (!interaction.member) return false;
+    if (!interaction.member.roles?.cache) return false;
+    
+    const guildId = interaction.guild?.id;
+    if (guildId) {
+        const serverRoles = db.getServerStaffRoles ? db.getServerStaffRoles(guildId) : [];
+        if (serverRoles && serverRoles.length > 0) {
+            return serverRoles.some(roleId => interaction.member.roles.cache.has(roleId));
+        }
+    }
+    if (config.staffRoleIds && config.staffRoleIds.length > 0) {
+        return config.staffRoleIds.some(roleId => interaction.member.roles.cache.has(roleId));
+    }
+    return false;
+}
+
+function getCooldownHours(member) {
+    if (!member) return 48;
+    const roles = member.roles.cache;
+    if (roles.some(r => r.name.toLowerCase().includes('gold'))) return 0;
+    if (roles.some(r => r.name.toLowerCase().includes('silver'))) return 24;
+    if (roles.some(r => r.name.toLowerCase().includes('bronze'))) return 24;
+    if (roles.some(r => r.name.toLowerCase().includes('donator'))) return 48;
+    return 48;
+}
+
+function isExemptFromHighDemand(member) {
+    if (!member) return false;
+    const roles = member.roles.cache;
+    return roles.some(r => {
+        const name = r.name.toLowerCase();
+        return name.includes('gold') || name.includes('silver') || name.includes('bronze') || name.includes('donator');
+    });
+}
+
+function getTicketFromChannel(channelId, guildId = null) {
+    let ticket = Array.from(activeUbisoftTickets.values()).find(t => t.threadId === channelId);
+    if (ticket) return ticket;
+    
+    // Try database recovery
+    try {
+        const savedTicket = db.getUbisoftTicketByThread ? db.getUbisoftTicketByThread(channelId) : null;
+        if (savedTicket && savedTicket.status !== 'closed') {
+            const ticketId = savedTicket.ticket_id;
+            activeUbisoftTickets.set(ticketId, {
+                id: ticketId,
+                threadId: savedTicket.thread_id,
+                channelId: savedTicket.thread_id,
+                userId: savedTicket.user_id,
+                username: savedTicket.username,
+                gameId: savedTicket.game_id,
+                gameName: savedTicket.game_name,
+                guildId: savedTicket.guild_id || guildId,
+                status: savedTicket.status || 'active',
+                isLinuxMac: savedTicket.is_linux_mac || false,
+                collectedScreenshots: [],
+                helpRequested: savedTicket.help_requested || false,
+                tokenRequestContent: null,
+                createdAt: savedTicket.created_at || Date.now()
+            });
+            ticket = activeUbisoftTickets.get(ticketId);
+            console.log(`[Ubisoft] Recovered ticket ${ticketId} from database`);
+            return ticket;
+        }
+    } catch (err) {
+        console.error('[Ubisoft] Recovery error:', err.message);
+    }
+    
+    return null;
+}
+
+// ============================================================================
+// TIMER FUNCTIONS
+// ============================================================================
+
+function setTicketTimer(ticketId, type, timer) {
+    const key = `${ticketId}_${type}`;
+    if (activeTimers.has(key)) clearTimeout(activeTimers.get(key));
+    activeTimers.set(key, timer);
+}
+
+function clearTicketTimer(ticketId, type) {
+    const key = `${ticketId}_${type}`;
+    if (activeTimers.has(key)) {
+        clearTimeout(activeTimers.get(key));
+        activeTimers.delete(key);
+    }
+}
+
+function clearAllTicketTimers(ticketId) {
+    ['screenshot', 'token_request', 'response', 'inactivity', 'success'].forEach(type => {
+        clearTicketTimer(ticketId, type);
+    });
+}
+
+// 10 minute screenshot timer
+function startScreenshotTimer(ticketId, channel) {
+    const timer = setTimeout(async () => {
+        const ticket = activeUbisoftTickets.get(ticketId);
+        if (!ticket || ticket.status !== 'awaiting_screenshot') return;
+        
+        await channel.send({
+            content: `<@${ticket.userId}>`,
+            embeds: [new EmbedBuilder()
+                .setColor(0xFF0000)
+                .setTitle('⏰ Time\'s Up!')
+                .setDescription('No screenshot uploaded within 10 minutes. Ticket closing.')
+            ]
+        });
+        await closeUbisoftTicket(ticketId, 'timeout_screenshot', channel);
+    }, config.screenshotTimeout);
+    
+    setTicketTimer(ticketId, 'screenshot', timer);
+}
+
+// 30 minute token request timer
+function startTokenRequestTimer(ticketId, channel) {
+    const timer = setTimeout(async () => {
+        const ticket = activeUbisoftTickets.get(ticketId);
+        if (!ticket || ticket.status !== 'awaiting_token_request') return;
+        
+        await channel.send({
+            content: `<@${ticket.userId}>`,
+            embeds: [new EmbedBuilder()
+                .setColor(0xFF0000)
+                .setTitle('⏰ Time\'s Up!')
+                .setDescription('No token request file uploaded within 30 minutes. Ticket closing.')
+            ]
+        });
+        await closeUbisoftTicket(ticketId, 'timeout_token_request', channel);
+    }, config.tokenRequestTimeout);
+    
+    setTicketTimer(ticketId, 'token_request', timer);
+}
+
+// 30 minute response timer after token sent
+function startResponseTimer(ticketId, channel) {
+    const timer = setTimeout(async () => {
+        const ticket = activeUbisoftTickets.get(ticketId);
+        if (!ticket || ticket.status !== 'token_sent') return;
+        
+        await channel.send({
+            content: `<@${ticket.userId}>`,
+            embeds: [new EmbedBuilder()
+                .setColor(0xFF0000)
+                .setTitle('⏰ No Response - Ghosted')
+                .setDescription('You didn\'t respond after receiving your token.\n\n**7-day cooldown applied.**')
+            ]
+        });
+        
+        // SHARED cooldown
+        db.setCooldown(ticket.userId, ticket.guildId, 'ticket', 168);
+        await logCooldownEvent(ticket.guildId, ticket.userId, ticket.username, 'applied', 'ticket', 168, 'System (ghosted)', null);
+        
+        await closeUbisoftTicket(ticketId, 'ghosted', channel);
+    }, config.responseTimeout);
+    
+    setTicketTimer(ticketId, 'response', timer);
+}
+
+// ============================================================================
+// LOGGING FUNCTIONS
+// ============================================================================
+
+async function logTicketEvent(ticket, eventType, details = {}) {
+    try {
+        const guildId = ticket.guildId;
+        
+        try {
+            db.logTicketEvent(
+                ticket.id, ticket.guildId, null, ticket.userId, ticket.username,
+                ticket.gameId, ticket.gameName, eventType, 
+                JSON.stringify({ ...details, platform: 'ubisoft' }), 
+                details.staffMember, details.staffId, details.durationMinutes,
+                'ubisoft'
+            );
+        } catch (dbErr) {
+            console.error('[Ubisoft TicketLog] DB error:', dbErr.message);
+        }
+        
+        const logChannelId = db.getServerTicketLogChannel ? db.getServerTicketLogChannel(guildId) : null;
+        if (!logChannelId) return;
+        
+        const channel = await client.channels.fetch(logChannelId).catch(() => null);
+        if (!channel) return;
+        
+        const colors = {
+            'opened': 0x00FF00, 'closed': 0xFF0000, 'success': 0x00FF00,
+            'cancelled': 0xFFA500, 'timeout': 0xFF6600, 'ghosted': 0x800080,
+            'step_change': 0x5865F2, 'staff_action': 0xFFFF00
+        };
+        
+        const emojis = {
+            'opened': '🎯', 'closed': '🔒', 'success': '✅',
+            'cancelled': '❌', 'timeout': '⏰', 'ghosted': '👻',
+            'step_change': '📝', 'staff_action': '👮'
+        };
+        
+        const embed = new EmbedBuilder()
+            .setColor(colors[eventType] || 0x5865F2)
+            .setTitle(`${emojis[eventType] || '📋'} [UBISOFT] Ticket ${eventType.replace('_', ' ')}`)
+            .addFields(
+                { name: '🎯 Ticket ID', value: ticket.id || 'N/A', inline: true },
+                { name: '👤 User', value: `<@${ticket.userId}>`, inline: true },
+                { name: '🎮 Game', value: ticket.gameName || 'Unknown', inline: true }
+            )
+            .setFooter({ text: 'Ubisoft Token System' })
+            .setTimestamp();
+        
+        if (details.reason) embed.addFields({ name: '📝 Reason', value: details.reason, inline: false });
+        if (details.staffMember) embed.addFields({ name: '👮 Staff', value: details.staffMember, inline: true });
+        
+        await channel.send({ embeds: [embed] });
+        
+    } catch (err) {
+        console.error('[Ubisoft TicketLog] Error:', err.message);
+    }
+}
+
+async function logCooldownEvent(guildId, userId, username, action, cooldownType, hours, staffMember, staffId) {
+    try {
+        const logChannelId = db.getServerTicketLogChannel ? db.getServerTicketLogChannel(guildId) : null;
+        
+        if (logChannelId) {
+            const channel = await client.channels.fetch(logChannelId).catch(() => null);
+            if (channel) {
+                const colors = { 'applied': 0xFF6600, 'removed': 0x00FF00 };
+                
+                const embed = new EmbedBuilder()
+                    .setColor(colors[action] || 0x5865F2)
+                    .setTitle(`⏱️ [UBISOFT] Cooldown ${action}`)
+                    .addFields(
+                        { name: '👤 User', value: `<@${userId}>`, inline: true },
+                        { name: '📋 Type', value: cooldownType === 'high_demand' ? 'High Demand' : 'Standard', inline: true }
+                    )
+                    .setTimestamp();
+                
+                if (hours && action === 'applied') {
+                    embed.addFields({ name: '⏰ Duration', value: `${hours} hours`, inline: true });
+                }
+                if (staffMember) {
+                    embed.addFields({ name: '👮 Staff', value: staffMember, inline: true });
+                }
+                
+                await channel.send({ embeds: [embed] });
+            }
+        }
+    } catch (err) {
+        console.error('[Ubisoft CooldownLog] Error:', err.message);
+    }
+}
+
+async function logActivation(ticket, duration) {
+    try {
+        const activationChannelId = db.getServerActivationLogChannel ? db.getServerActivationLogChannel(ticket.guildId) : null;
+        
+        if (activationChannelId) {
+            const channel = await client.channels.fetch(activationChannelId).catch(() => null);
+            if (channel) {
+                const game = db.getUbisoftGame(ticket.gameId);
+                
+                const embed = new EmbedBuilder()
+                    .setColor(0x00FF00)
+                    .setTitle('✅ [UBISOFT] Game Activated')
+                    .setThumbnail(game?.cover_url || null)
+                    .addFields(
+                        { name: '👤 User', value: `<@${ticket.userId}>`, inline: true },
+                        { name: '🎮 Game', value: ticket.gameName || 'Unknown', inline: true },
+                        { name: '⏱️ Duration', value: `${duration} min`, inline: true },
+                        { name: '🎯 Ticket', value: ticket.id, inline: true }
+                    )
+                    .setTimestamp();
+                
+                await channel.send({ embeds: [embed] });
+            }
+        }
+    } catch (err) {
+        console.error('[Ubisoft ActivationLog] Error:', err.message);
+    }
+}
+
+// ============================================================================
+// PANEL CREATION
+// ============================================================================
+
+async function createUbisoftPanel(channel, panelType = 'free') {
+    try {
+        const games = panelType === 'free' 
+            ? db.getUbisoftGamesByPanel('free') 
+            : db.getUbisoftGamesByPanel('paid');
+        
+        if (!games || games.length === 0) {
+            return channel.send(`No ${panelType} Ubisoft games available.`);
+        }
+        
+        games.sort((a, b) => a.game_name.localeCompare(b.game_name));
+        
+        let totalAvailable = 0, gamesWithTokens = 0, highDemandCount = 0;
+        for (const game of games) {
+            const available = db.getAvailableUbisoftTokenCount(game.id);
+            if (available > 0) { totalAvailable += available; gamesWithTokens++; }
+            if (game.demand_type === 'high') highDemandCount++;
+        }
+        
+        const options = games.map(game => {
+            const available = db.getAvailableUbisoftTokenCount(game.id);
+            let emoji = available >= 10 ? '🟢' : available > 0 ? '🟡' : '🔴';
+            if (game.demand_type === 'high') emoji = '🔥';
+            return {
+                label: game.game_name.substring(0, 100),
+                description: `${available} tokens available`,
+                value: `ubisoft_game_${game.id}`,
+                emoji
+            };
+        });
+        
+        const menu = new StringSelectMenuBuilder()
+            .setCustomId(`ubisoft_panel_${panelType}_0`)
+            .setPlaceholder('🎯 Select a Ubisoft game...')
+            .addOptions(options.slice(0, 25));
+        
+        const panelTitle = panelType === 'free' ? "🎯 Ubisoft Free Games" : "🎯 Ubisoft Premium Games";
+        
+        const embed = new EmbedBuilder()
+            .setColor(panelType === 'free' ? 0x00ff00 : 0xffd700)
+            .setTitle(panelTitle)
+            .setDescription(`*Select a game from the dropdown below*\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
+            .addFields(
+                { name: '🎫 Available', value: `**${totalAvailable}** tokens`, inline: true },
+                { name: '🎮 Games', value: `**${gamesWithTokens}**/${games.length}`, inline: true },
+                { name: '🔥 High Demand', value: `**${highDemandCount}** games`, inline: true },
+                { name: '📖 Legend', value: '🔥 High Demand | 🟢 10+ | 🟡 <10 | 🔴 Empty', inline: false }
+            )
+            .setFooter({ text: `🎯 Ubisoft Token System | ${panelType === 'free' ? 'Free' : 'Premium'} Panel` })
+            .setTimestamp();
+        
+        const buttonRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId('ubisoft_refresh_panel').setLabel('Refresh').setEmoji('🔄').setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder().setCustomId('ubisoft_view_high_demand').setLabel('High Demand').setEmoji('🔥').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId('ubisoft_view_rules').setLabel('Rules').setEmoji('📋').setStyle(ButtonStyle.Primary)
+        );
+        
+        const message = await channel.send({
+            embeds: [embed],
+            components: [new ActionRowBuilder().addComponents(menu), buttonRow]
+        });
+        
+        ubisoftPanels.set(channel.guild.id, { messageId: message.id, channelId: channel.id, type: panelType });
+        if (db.saveUbisoftPanel) {
+            db.saveUbisoftPanel(channel.guild.id, message.id, channel.id, panelType);
+        }
+        
+        console.log(`[Ubisoft] Created ${panelType} panel with ${games.length} games`);
+        return message;
+        
+    } catch (error) {
+        console.error('[Ubisoft] Error creating panel:', error);
+    }
+}
+
+async function updateUbisoftPanel() {
+    if (ubisoftPanels.size === 0) {
+        try {
+            const panels = db.getAllUbisoftPanels ? db.getAllUbisoftPanels() : [];
+            for (const panel of panels) {
+                ubisoftPanels.set(panel.guild_id, {
+                    messageId: panel.panel_message_id,
+                    channelId: panel.panel_channel_id,
+                    type: panel.panel_type || 'free'
+                });
+            }
+        } catch (e) {}
+    }
+    
+    if (ubisoftPanels.size === 0) return;
+    
+    for (const [guildId, panelInfo] of ubisoftPanels) {
+        try {
+            const panelType = panelInfo.type || 'free';
+            const games = panelType === 'free' 
+                ? db.getUbisoftGamesByPanel('free') 
+                : db.getUbisoftGamesByPanel('paid');
+            
+            if (!games || games.length === 0) continue;
+            
+            games.sort((a, b) => a.game_name.localeCompare(b.game_name));
+            
+            let totalAvailable = 0, gamesWithTokens = 0, highDemandCount = 0;
+            for (const game of games) {
+                const available = db.getAvailableUbisoftTokenCount(game.id);
+                if (available > 0) { totalAvailable += available; gamesWithTokens++; }
+                if (game.demand_type === 'high') highDemandCount++;
+            }
+            
+            const options = games.map(game => {
+                const available = db.getAvailableUbisoftTokenCount(game.id);
+                let emoji = available >= 10 ? '🟢' : available > 0 ? '🟡' : '🔴';
+                if (game.demand_type === 'high') emoji = '🔥';
+                return {
+                    label: game.game_name.substring(0, 100),
+                    description: `${available} tokens available`,
+                    value: `ubisoft_game_${game.id}`,
+                    emoji
+                };
+            });
+            
+            const menu = new StringSelectMenuBuilder()
+                .setCustomId(`ubisoft_panel_${panelType}_0`)
+                .setPlaceholder('🎯 Select a Ubisoft game...')
+                .addOptions(options.slice(0, 25));
+            
+            const panelTitle = panelType === 'free' ? "🎯 Ubisoft Free Games" : "🎯 Ubisoft Premium Games";
+            
+            const embed = new EmbedBuilder()
+                .setColor(panelType === 'free' ? 0x00ff00 : 0xffd700)
+                .setTitle(panelTitle)
+                .setDescription(`*Select a game from the dropdown below*\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
+                .addFields(
+                    { name: '🎫 Available', value: `**${totalAvailable}** tokens`, inline: true },
+                    { name: '🎮 Games', value: `**${gamesWithTokens}**/${games.length}`, inline: true },
+                    { name: '🔥 High Demand', value: `**${highDemandCount}** games`, inline: true },
+                    { name: '📖 Legend', value: '🔥 High Demand | 🟢 10+ | 🟡 <10 | 🔴 Empty', inline: false }
+                )
+                .setFooter({ text: `🎯 Ubisoft Token System | ${panelType === 'free' ? 'Free' : 'Premium'} Panel` })
+                .setTimestamp();
+            
+            const buttonRow = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('ubisoft_refresh_panel').setLabel('Refresh').setEmoji('🔄').setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder().setCustomId('ubisoft_view_high_demand').setLabel('High Demand').setEmoji('🔥').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId('ubisoft_view_rules').setLabel('Rules').setEmoji('📋').setStyle(ButtonStyle.Primary)
+            );
+            
+            const channel = await client.channels.fetch(panelInfo.channelId);
+            const message = await channel.messages.fetch(panelInfo.messageId);
+            await message.edit({
+                embeds: [embed],
+                components: [new ActionRowBuilder().addComponents(menu), buttonRow]
+            });
+            
+        } catch (err) {
+            console.error(`[Ubisoft Panel] Update error for ${guildId}:`, err.message);
+            if (err.code === 10008 || err.code === 10003) ubisoftPanels.delete(guildId);
+        }
+    }
+}
+
+// ============================================================================
+// TICKET CREATION - STEP 1: SCREENSHOTS
+// ============================================================================
+
+async function createUbisoftTicket(interaction, gameId) {
+    try {
+        await interaction.deferReply({ ephemeral: true });
+    } catch (e) {
+        return;
+    }
+    
+    const game = db.getUbisoftGame(gameId);
+    if (!game) {
+        return interaction.editReply({ content: '❌ Game not found.' });
+    }
+    
+    // Server membership check
+    let isInMainServer = false, isInPaidServer = false, isInFreeServer = false;
+    
+    try {
+        const mainGuild = await client.guilds.fetch(config.mainServerId).catch(() => null);
+        if (mainGuild) {
+            const mainMember = await mainGuild.members.fetch(interaction.user.id).catch(() => null);
+            isInMainServer = !!mainMember;
+        }
+        
+        const paidGuild = await client.guilds.fetch(config.paidServerId).catch(() => null);
+        if (paidGuild) {
+            const paidMember = await paidGuild.members.fetch(interaction.user.id).catch(() => null);
+            isInPaidServer = !!paidMember;
+        }
+        
+        const freeGuild = await client.guilds.fetch(config.freeServerId).catch(() => null);
+        if (freeGuild) {
+            const freeMember = await freeGuild.members.fetch(interaction.user.id).catch(() => null);
+            isInFreeServer = !!freeMember;
+        }
+    } catch (err) {
+        console.log(`[Ubisoft] Server check error: ${err.message}`);
+    }
+    
+    if (!isInMainServer) {
+        return interaction.editReply({ content: '❌ **Main Server Required**\n\nJoin the main server first!' });
+    }
+    
+    if (!isInPaidServer && !isInFreeServer) {
+        return interaction.editReply({ content: '❌ **Tier Server Required**\n\nJoin Paid or Free server!' });
+    }
+    
+    // Check timeout
+    if (interaction.member?.communicationDisabledUntil) {
+        const timeoutEnd = new Date(interaction.member.communicationDisabledUntil);
+        if (timeoutEnd > new Date()) {
+            return interaction.editReply({ content: '❌ **You have a timeout**\n\nTry again later.' });
+        }
+    }
+    
+    // Check existing ticket
+    const existingTicket = db.getUbisoftUserOpenTicket ? db.getUbisoftUserOpenTicket(interaction.user.id, interaction.guild.id) : null;
+    if (existingTicket) {
+        return interaction.editReply({ content: '❌ You already have an open Ubisoft ticket!' });
+    }
+    
+    // SHARED COOLDOWN CHECK
+    const cooldown = db.getUniversalCooldown(interaction.user.id, 'ticket');
+    if (cooldown) {
+        const expiresAt = new Date(cooldown.expires_at);
+        return interaction.editReply({ 
+            content: `❌ **Cooldown Active!**\n\nYou have a cooldown (applies to Steam & Ubisoft).\nTry again <t:${Math.floor(expiresAt.getTime() / 1000)}:R>` 
+        });
+    }
+    
+    // SHARED HIGH DEMAND cooldown check
+    if (game.demand_type === 'high') {
+        const hdCooldown = db.getUniversalCooldown(interaction.user.id, 'high_demand');
+        if (hdCooldown) {
+            const expiresAt = new Date(hdCooldown.expires_at);
+            return interaction.editReply({ 
+                content: `🔥 **HD Cooldown Active!**\n\nTry again <t:${Math.floor(expiresAt.getTime() / 1000)}:R>\n\n💡 You can still request normal games!` 
+            });
+        }
+    }
+    
+    // Check tokens
+    const available = db.getAvailableUbisoftTokenCount(gameId);
+    if (available <= 0) {
+        return interaction.editReply({ content: `❌ No tokens for **${game.game_name}**.` });
+    }
+    
+    try {
+        const serverTicketChannelId = db.getUbisoftTicketChannel ? db.getUbisoftTicketChannel(interaction.guild.id) : null;
+        const ticketChannelId = serverTicketChannelId || config.ticketChannelId;
+        const ticketChannel = await client.channels.fetch(ticketChannelId);
+        
+        if (ticketChannel.guild?.id !== interaction.guild.id) {
+            return interaction.editReply({ content: '❌ Ticket channel not configured. Run `/ubisoft-setup`.' });
+        }
+        
+        const ticketId = generateTicketId();
+        const isHighDemand = game.demand_type === 'high';
+        
+        // STEP 1: Ask for screenshots (10 min timer)
+        const embed = new EmbedBuilder()
+            .setColor(isHighDemand ? 0xFF6600 : 0x5865F2)
+            .setTitle(`🎯 ${game.game_name}`)
+            .setDescription(`Welcome **${interaction.user.username}**!\n\n${isHighDemand ? '🔥 **HIGH DEMAND GAME**\n\n' : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📸 **Step 1: Upload Screenshots**`)
+            .addFields(
+                { name: '📋 Required', value: '• Game folder properties (showing size)\n• Proof of legitimate installation', inline: false },
+                { name: '⏱️ Time Limit', value: '10 minutes', inline: true },
+                { name: '📦 Expected Size', value: game.size_gb ? `~${game.size_gb} GB` : 'Any size', inline: true }
+            )
+            .setFooter({ text: `Ticket: ${ticketId}` })
+            .setTimestamp();
+        
+        if (game.cover_url) embed.setThumbnail(game.cover_url);
+        
+        // Create thread
+        let thread;
+        if (ticketChannel.type === ChannelType.GuildForum) {
+            thread = await ticketChannel.threads.create({
+                name: `🎯 ${interaction.user.username} | ${game.game_name}`,
+                autoArchiveDuration: 1440,
+                message: { content: `<@${interaction.user.id}>`, embeds: [embed] }
+            });
+            try { await thread.members.add(interaction.user.id); } catch (e) {}
+        } else {
+            thread = await ticketChannel.threads.create({
+                name: `🎯 ${interaction.user.username} | ${game.game_name}`,
+                autoArchiveDuration: 1440,
+                type: ChannelType.PrivateThread,
+                invitable: false
+            });
+            await thread.send({ content: `<@${interaction.user.id}>`, embeds: [embed] });
+            await thread.members.add(interaction.user.id);
+        }
+        
+        // Buttons
+        const buttons = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`ubisoft_linux_mac_${ticketId}`).setLabel('Linux/Mac').setEmoji('🐧').setStyle(ButtonStyle.Primary),
+            new ButtonBuilder().setCustomId(`ubisoft_need_help_${ticketId}`).setLabel('Need Help').setEmoji('🆘').setStyle(ButtonStyle.Danger),
+            new ButtonBuilder().setCustomId(`ubisoft_close_${ticketId}`).setLabel('Close').setEmoji('🚪').setStyle(ButtonStyle.Secondary)
+        );
+        await thread.send({ components: [buttons] });
+        
+        // Store ticket
+        const ticketData = {
+            id: ticketId,
+            threadId: thread.id,
+            channelId: thread.id,
+            userId: interaction.user.id,
+            username: interaction.user.username,
+            gameId,
+            gameName: game.game_name,
+            guildId: interaction.guild.id,
+            status: 'awaiting_screenshot',  // Step 1
+            isLinuxMac: false,
+            collectedScreenshots: [],
+            helpRequested: false,
+            tokenRequestContent: null,
+            queuePosition: null,
+            createdAt: Date.now()
+        };
+        
+        activeUbisoftTickets.set(ticketId, ticketData);
+        
+        if (db.createUbisoftTicket) {
+            db.createUbisoftTicket(ticketId, thread.id, interaction.guild.id, interaction.user.id, interaction.user.username, gameId);
+        }
+        
+        startScreenshotTimer(ticketId, thread);
+        
+        await logTicketEvent(ticketData, 'opened', { reason: 'User opened ticket' });
+        await updateUbisoftPanel();
+        
+        await interaction.editReply({ content: `✅ Ticket created! Head to ${thread}` });
+        
+    } catch (err) {
+        console.error('[Ubisoft] Ticket creation error:', err);
+        await interaction.editReply({ content: '❌ Failed to create ticket.' }).catch(() => {});
+    }
+}
+
+// ============================================================================
+// SCREENSHOT HANDLING
+// ============================================================================
+
+async function handleUbisoftScreenshot(message) {
+    const ticket = Array.from(activeUbisoftTickets.values()).find(t => 
+        t.threadId === message.channel.id && message.author.id === t.userId
+    );
+    
+    if (!ticket) return;
+    if (ticket.status !== 'awaiting_screenshot' && ticket.status !== 'awaiting_linux_screenshot') return;
+    
+    const images = message.attachments.filter(a => a.contentType?.startsWith('image/'));
+    if (images.size === 0) return;
+    
+    if (!ticket.collectedScreenshots) ticket.collectedScreenshots = [];
+    
+    let tooSmallCount = 0;
+    for (const [, image] of images) {
+        if (image.size < 10 * 1024) { tooSmallCount++; continue; }
+        ticket.collectedScreenshots.push({
+            url: image.url,
+            proxyURL: image.proxyURL,
+            name: image.name,
+            size: image.size
+        });
+    }
+    
+    if (tooSmallCount > 0 && ticket.collectedScreenshots.length === 0) {
+        await message.reply({ content: '⚠️ Image too small. Upload actual screenshots.' }).catch(() => {});
+        return;
+    }
+    
+    clearTicketTimer(ticket.id, 'screenshot');
+    
+    const embed = new EmbedBuilder()
+        .setColor(0x5865F2)
+        .setTitle('📸 Screenshots Received!')
+        .setDescription(`**${ticket.collectedScreenshots.length}** screenshot(s) uploaded.\n\nClick **Submit** when ready for verification.`)
+        .setThumbnail(ticket.collectedScreenshots[ticket.collectedScreenshots.length - 1].url);
+    
+    const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`ubisoft_submit_screenshots_${ticket.id}`).setLabel(`Submit ${ticket.collectedScreenshots.length}`).setEmoji('✅').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`ubisoft_clear_screenshots_${ticket.id}`).setLabel('Clear').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
+    );
+    
+    if (ticket.submitMessageId) {
+        try { const oldMsg = await message.channel.messages.fetch(ticket.submitMessageId); await oldMsg.delete(); } catch (e) {}
+    }
+    
+    const submitMsg = await message.channel.send({ embeds: [embed], components: [buttons] });
+    ticket.submitMessageId = submitMsg.id;
+    
+    // Restart timer while they collect screenshots
+    startScreenshotTimer(ticket.id, message.channel);
+}
+
+async function processUbisoftScreenshots(interaction, ticketId) {
+    const ticket = activeUbisoftTickets.get(ticketId);
+    if (!ticket || !ticket.collectedScreenshots?.length) return;
+    if (ticket.processingScreenshots) return;
+    if (ticket.status === 'awaiting_staff') {
+        try { await interaction.reply({ content: '⏳ Being reviewed by staff.', ephemeral: true }); } catch(e) {}
+        return;
+    }
+    
+    ticket.processingScreenshots = true;
+    try { await interaction.deferUpdate(); } catch (e) { ticket.processingScreenshots = false; return; }
+    
+    const game = db.getUbisoftGame(ticket.gameId);
+    const imageUrls = ticket.collectedScreenshots.map(s => s.url);
+    
+    clearTicketTimer(ticket.id, 'screenshot');
+    
+    if (aiVerifier) {
+        const verifyingEmbed = new EmbedBuilder()
+            .setColor(0xFFFF00)
+            .setTitle('🔍 Verifying Screenshots...')
+            .setDescription('AI is checking your screenshots.');
+        
+        try { await interaction.message.edit({ embeds: [verifyingEmbed], components: [] }); } catch (e) {}
+        
+        const result = await aiVerifier.verifyScreenshots(imageUrls, {
+            gameName: game.game_name,
+            expectedSize: game.size_gb,
+            folderName: game.folder_name || game.game_name
+        });
+        
+        if (result.decision === 'approve') {
+            await showInstructionsAndDownload(interaction, ticket, game);
+        } else if (result.decision === 'reject') {
+            ticket.status = 'awaiting_screenshot';
+            ticket.processingScreenshots = false;
+            
+            const rejectEmbed = new EmbedBuilder()
+                .setColor(0xFF0000)
+                .setTitle('❌ Verification Failed')
+                .setDescription(`**Issue:** ${result.reason}\n\nPlease upload new screenshots.`)
+                .setImage(imageUrls[0]);
+            
+            const retryButtons = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`ubisoft_need_help_${ticket.id}`).setLabel('Help').setEmoji('🆘').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId(`ubisoft_close_${ticket.id}`).setLabel('Close').setEmoji('🚪').setStyle(ButtonStyle.Secondary)
+            );
+            
+            try { await interaction.message.edit({ embeds: [rejectEmbed], components: [retryButtons] }); }
+            catch (e) { await interaction.channel.send({ embeds: [rejectEmbed], components: [retryButtons] }); }
+            
+            ticket.collectedScreenshots = [];
+            startScreenshotTimer(ticket.id, interaction.channel);
+        } else {
+            // Staff review needed
+            ticket.status = 'awaiting_staff';
+            ticket.processingScreenshots = false;
+            
+            await requestUbisoftManualReview(interaction.channel, ticket, game, imageUrls, result.reason);
+            
+            const staffEmbed = new EmbedBuilder()
+                .setColor(0xFFA500)
+                .setTitle('⏳ Staff Review Required')
+                .setDescription('Your screenshots have been sent to staff. Please wait.');
+            
+            try { await interaction.message.edit({ embeds: [staffEmbed], components: [] }); }
+            catch (e) { await interaction.channel.send({ embeds: [staffEmbed] }); }
+        }
+    } else {
+        // No AI - send to staff
+        ticket.status = 'awaiting_staff';
+        ticket.processingScreenshots = false;
+        
+        await requestUbisoftManualReview(interaction.channel, ticket, game, imageUrls, 'AI not available');
+        
+        const staffEmbed = new EmbedBuilder()
+            .setColor(0xFFA500)
+            .setTitle('⏳ Sent for Staff Review')
+            .setDescription('Staff will verify your screenshots.');
+        
+        try { await interaction.message.edit({ embeds: [staffEmbed], components: [] }); }
+        catch (e) { await interaction.channel.send({ embeds: [staffEmbed] }); }
+    }
+    
+    ticket.collectedScreenshots = [];
+    ticket.submitMessageId = null;
+}
+
+async function requestUbisoftManualReview(channel, ticket, game, imageUrls, reason) {
+    const urls = Array.isArray(imageUrls) ? imageUrls : [imageUrls];
+    
+    const embed = new EmbedBuilder()
+        .setColor(0xFFA500)
+        .setTitle('⚠️ [UBISOFT] Staff Review Required')
+        .setDescription(`**Reason:** ${reason}`)
+        .addFields(
+            { name: '🎮 Game', value: game.game_name, inline: true },
+            { name: '📦 Expected', value: `${game.size_gb || '?'} GB`, inline: true },
+            { name: '📸 Screenshots', value: `${urls.length}`, inline: true }
+        )
+        .setImage(urls[0])
+        .setFooter({ text: `Ticket: ${ticket.id}` });
+    
+    const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`ubisoft_staff_approve_${ticket.id}`).setLabel('Approve').setEmoji('✅').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`ubisoft_staff_reject_${ticket.id}`).setLabel('Reject').setEmoji('❌').setStyle(ButtonStyle.Danger)
+    );
+    
+    await channel.send({ content: getStaffMention(ticket.guildId), embeds: [embed], components: [buttons] });
+    
+    for (let i = 1; i < urls.length; i++) {
+        await channel.send({ embeds: [new EmbedBuilder().setColor(0xFFA500).setImage(urls[i])] });
+    }
+}
+
+// ============================================================================
+// STEP 2: SHOW INSTRUCTIONS AND DOWNLOAD LINK
+// ============================================================================
+
+async function showInstructionsAndDownload(interaction, ticket, game) {
+    ticket.status = 'awaiting_token_request';
+    ticket.processingScreenshots = false;
+    
+    if (db.markUbisoftScreenshotVerified) db.markUbisoftScreenshotVerified(ticket.id);
+    
+    await logTicketEvent(ticket, 'step_change', { step: 'Screenshots verified' });
+    
+    // Get download link and instructions from database
+    const downloadLinks = game.download_links || '';
+    const instructions = game.instructions || getDefaultInstructions(game.game_name);
+    
+    // Build download link display
+    let downloadSection = '';
+    if (downloadLinks) {
+        // Try to parse as JSON first
+        try {
+            const links = JSON.parse(downloadLinks);
+            if (Array.isArray(links)) {
+                downloadSection = links.map(l => `📥 [${l.name || game.game_name}](${l.url})`).join('\n');
+            } else if (typeof links === 'object') {
+                downloadSection = `📥 [${game.game_name} Setup Files](${links.url || downloadLinks})`;
+            }
+        } catch {
+            // Plain URL
+            downloadSection = `📥 [${game.game_name} Setup Files](${downloadLinks})`;
+        }
+    }
+    
+    const embed = new EmbedBuilder()
+        .setColor(0x00FF00)
+        .setTitle('✅ Screenshots Verified!')
+        .setDescription(`**Step 2: Download Setup Files & Generate Token Request**\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n${downloadSection ? downloadSection + '\n\n' : ''}`)
+        .addFields(
+            { name: '📋 Instructions', value: instructions.substring(0, 1024), inline: false },
+            { name: '📤 Next Step', value: 'After following the instructions, upload your **token_request.txt** file here.', inline: false },
+            { name: '⏱️ Time Limit', value: '30 minutes to upload the txt file', inline: true }
+        )
+        .setFooter({ text: `Ticket: ${ticket.id}` })
+        .setTimestamp();
+    
+    if (game.cover_url) embed.setThumbnail(game.cover_url);
+    
+    const buttons = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`ubisoft_need_help_${ticket.id}`).setLabel('Need Help').setEmoji('🆘').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId(`ubisoft_close_${ticket.id}`).setLabel('Close').setEmoji('🚪').setStyle(ButtonStyle.Secondary)
+    );
+    
+    try { 
+        await interaction.message.edit({ embeds: [embed], components: [buttons] }); 
+    } catch (e) { 
+        await interaction.channel.send({ embeds: [embed], components: [buttons] }); 
+    }
+    
+    await interaction.channel.send({ 
+        content: `<@${ticket.userId}> ✅ **Verified!** Follow the instructions above and upload your token request txt file.` 
+    }).catch(() => {});
+    
+    // Start 30 minute timer for token request
+    startTokenRequestTimer(ticket.id, interaction.channel);
+}
+
+function getDefaultInstructions(gameName) {
+    return `\`\`\`
+1. Download and extract the setup files
+2. Follow the included README
+3. Run the token generator tool
+4. Upload the generated token_request.txt here
+\`\`\`
+
+⚠️ **Important:**
+• Never launch the game through Ubisoft Connect
+• Never update the game files`;
+}
+
+// ============================================================================
+// STEP 3: HANDLE TOKEN REQUEST TXT FILE
+// ============================================================================
+
+async function handleUbisoftTokenRequestFile(message) {
+    const ticket = Array.from(activeUbisoftTickets.values()).find(t => 
+        t.threadId === message.channel.id && message.author.id === t.userId
+    );
+    
+    if (!ticket) return;
+    if (ticket.status !== 'awaiting_token_request') return;
+    
+    // Look for .txt attachment
+    const txtFile = message.attachments.find(a => a.name?.toLowerCase().endsWith('.txt'));
+    if (!txtFile) return;
+    
+    // Download and read the file content
+    try {
+        const response = await fetch(txtFile.url);
+        const content = await response.text();
+        
+        if (!content || content.trim().length < 10) {
+            await message.reply({ content: '❌ The txt file appears to be empty or invalid. Please upload a valid token request file.' });
+            return;
+        }
+        
+        // Stop the token request timer
+        clearTicketTimer(ticket.id, 'token_request');
+        
+        ticket.tokenRequestContent = content.trim();
+        ticket.status = 'in_queue';
+        
+        // Add to FIFO queue
+        const queueEntry = {
+            ticketId: ticket.id,
+            channel: message.channel,
+            addedAt: Date.now()
+        };
+        
+        tokenQueue.push(queueEntry);
+        const position = tokenQueue.length;
+        ticket.queuePosition = position;
+        
+        console.log(`[Ubisoft] Ticket ${ticket.id} added to queue at position ${position}`);
+        
+        // Show queue status
+        const queueEmbed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('📥 Token Request Received!')
+            .setDescription(`Your request has been added to the queue.`)
+            .addFields(
+                { name: '📊 Queue Position', value: `**#${position}**`, inline: true },
+                { name: '⏱️ Estimated Wait', value: `~${position * 2} minutes`, inline: true }
+            )
+            .setFooter({ text: 'Processing in order...' });
+        
+        await message.reply({ embeds: [queueEmbed] });
+        
+        await logTicketEvent(ticket, 'step_change', { step: `Added to queue at position ${position}` });
+        
+        // Process queue if not already processing
+        processTokenQueue();
+        
+    } catch (err) {
+        console.error('[Ubisoft] Error reading token request file:', err);
+        await message.reply({ content: '❌ Error reading the file. Please try uploading again.' });
+    }
+}
+
+// ============================================================================
+// FIFO QUEUE PROCESSING
+// ============================================================================
+
+async function processTokenQueue() {
+    if (isProcessingQueue) return;
+    if (tokenQueue.length === 0) return;
+    
+    isProcessingQueue = true;
+    
+    while (tokenQueue.length > 0) {
+        const entry = tokenQueue[0];
+        const ticket = activeUbisoftTickets.get(entry.ticketId);
+        
+        if (!ticket) {
+            tokenQueue.shift();
+            continue;
+        }
+        
+        // Update queue positions for remaining tickets
+        tokenQueue.forEach((e, i) => {
+            const t = activeUbisoftTickets.get(e.ticketId);
+            if (t) t.queuePosition = i + 1;
+        });
+        
+        ticket.status = 'processing';
+        
+        // Notify user processing started
+        const processingEmbed = new EmbedBuilder()
+            .setColor(0xFFFF00)
+            .setTitle('⚡ Processing Your Request...')
+            .setDescription('Generating your token. This may take 1-2 minutes.')
+            .addFields({ name: '🎮 Game', value: ticket.gameName, inline: true });
+        
+        try {
+            await entry.channel.send({ content: `<@${ticket.userId}>`, embeds: [processingEmbed] });
+        } catch (e) {
+            console.error('[Ubisoft] Error sending processing message:', e.message);
+        }
+        
+        // Generate token
+        const result = await generateUbisoftToken(ticket);
+        
+        if (result.success) {
+            ticket.status = 'token_sent';
+            
+            const game = db.getUbisoftGame(ticket.gameId);
+            
+            const successEmbed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle('🎉 Your Token is Ready!')
+                .setDescription('Download the token file below and follow the usage instructions.')
+                .addFields(
+                    { name: '📋 Usage', value: '1. Extract token.txt to your game folder\n2. Launch the game (NOT through Ubisoft Connect)\n3. Enjoy!', inline: false },
+                    { name: '⏱️ Response Required', value: 'Please click a button below within 30 minutes', inline: false }
+                );
+            
+            if (game?.cover_url) successEmbed.setThumbnail(game.cover_url);
+            
+            const responseButtons = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`ubisoft_it_works_${ticket.id}`).setLabel('It Works!').setEmoji('✅').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId(`ubisoft_token_help_${ticket.id}`).setLabel('Need Help').setEmoji('🆘').setStyle(ButtonStyle.Danger)
+            );
+            
+            try {
+                await entry.channel.send({
+                    content: `<@${ticket.userId}> 🎉 **Token ready!**`,
+                    embeds: [successEmbed],
+                    components: [responseButtons]
+                });
+                
+                // Send the token file
+                if (result.tokenFile && fs.existsSync(result.tokenFile)) {
+                    await entry.channel.send({ 
+                        content: '📁 **Your Token File:**', 
+                        files: [result.tokenFile] 
+                    });
+                }
+            } catch (e) {
+                console.error('[Ubisoft] Error sending token:', e.message);
+            }
+            
+            await logTicketEvent(ticket, 'step_change', { step: 'Token sent' });
+            
+            // Start 30 minute response timer
+            startResponseTimer(ticket.id, entry.channel);
+            
+        } else {
+            ticket.status = 'generation_failed';
+            
+            try {
+                await entry.channel.send({
+                    content: `${getStaffMention(ticket.guildId)} <@${ticket.userId}>`,
+                    embeds: [new EmbedBuilder()
+                        .setColor(0xFF0000)
+                        .setTitle('❌ Generation Failed')
+                        .setDescription(`**Error:** ${result.error}\n\nStaff has been notified.`)
+                    ]
+                });
+            } catch (e) {}
+            
+            await logTicketEvent(ticket, 'step_change', { step: 'Generation failed', error: result.error });
+        }
+        
+        // Remove from queue
+        tokenQueue.shift();
+        
+        // Small delay between processing
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    
+    isProcessingQueue = false;
+}
+
+// ============================================================================
+// TOKEN GENERATION
+// ============================================================================
+
+async function generateUbisoftToken(ticket) {
+    return new Promise((resolve) => {
+        try {
+            if (!fs.existsSync(config.denuvoExePath)) {
+                resolve({ success: false, error: 'DenuvoTicket.exe not found.' });
+                return;
+            }
+
+            // Get available account
+            const tokenData = db.getAvailableUbisoftToken(ticket.gameId);
+            if (!tokenData) {
+                resolve({ success: false, error: 'No available accounts.' });
+                return;
+            }
+
+            const email = tokenData.email;
+            const password = tokenData.password;
+
+            // Ensure token is string + escape internal quotes
+            let tokenContent = (ticket.tokenRequestContent || '').toString().replace(/"/g, '\\"');
+
+            // Wrap token inside quotes as required -> "tokenContent"
+            const quotedToken = `"${tokenContent}"`;
+
+            // Clean old output files
+            const tokenOutputFile = path.join(config.tokenOutputPath, 'token.txt');
+            const logOutputFile = path.join(config.tokenOutputPath, 'generation.log');
+
+            try { fs.unlinkSync(tokenOutputFile); } catch (e) {}
+            try { fs.unlinkSync(logOutputFile); } catch (e) {}
+
+            console.log(`[Ubisoft] Generating token for ${ticket.id} using account ${email}`);
+
+            // FINAL ARG STRUCTURE (CORRECT):
+            // DenuvoTicket.exe -login email -password pass -token "token_content"
+            const args = [
+                '-login', email,
+                '-password', password,
+                '-token', quotedToken
+            ];
+
+            const exeDir = path.dirname(config.denuvoExePath);
+
+            const process = spawn(config.denuvoExePath, args, {
+                cwd: exeDir,
+                windowsHide: true
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            process.stdout.on('data', data => stdout += data.toString());
+            process.stderr.on('data', data => stderr += data.toString());
+
+            const timeout = setTimeout(() => {
+                try { process.kill(); } catch (e) {}
+                resolve({ success: false, error: 'Process timed out (2 minutes)' });
+            }, 120000);
+
+            process.on('close', (code) => {
+                clearTimeout(timeout);
+
+                console.log(`[Ubisoft] Process exited with code ${code}`);
+                if (stdout) console.log('[Ubisoft] stdout:', stdout.substring(0, 500));
+                if (stderr) console.log('[Ubisoft] stderr:', stderr.substring(0, 500));
+
+                // Save log
+                try {
+                    fs.writeFileSync(logOutputFile, `stdout:\n${stdout}\n\nstderr:\n${stderr}`, 'utf8');
+                } catch (e) {}
+
+                // Wait for file write
+                setTimeout(() => {
+
+                    // token.txt exists?
+                    if (fs.existsSync(tokenOutputFile)) {
+                        const content = fs.readFileSync(tokenOutputFile, 'utf8');
+
+                        if (content && content.length > 10) {
+
+                            // Determine account actually used
+                            let usedAccount = tokenData;
+                            const out = stdout + stderr;
+
+                            const allAccounts = db.getAllUbisoftAccounts ? db.getAllUbisoftAccounts() : [];
+
+                            for (const acc of allAccounts) {
+                                if (acc && acc.email && out.includes(acc.email)) {
+
+                                    // DB lookup for a matching token row
+                                    try {
+                                        const accToken = db.getDatabase().prepare(`
+                                            SELECT t.* FROM ubisoft_tokens t
+                                            WHERE t.account_id = ? AND t.game_id = ?
+                                            AND (t.last_used_at IS NULL OR datetime(t.last_used_at, '+24 hours') <= datetime('now'))
+                                            LIMIT 1
+                                        `).get(acc.id, ticket.gameId);
+
+                                        if (accToken) {
+                                            usedAccount = { 
+                                                ...accToken, 
+                                                email: acc.email, 
+                                                account_name: acc.account_name 
+                                            };
+                                            console.log(`[Ubisoft] Actual account used: ${acc.email}`);
+                                            break;
+                                        }
+                                    } catch (e) {}
+                                }
+                            }
+
+                            // Mark token used
+                            try {
+                                db.markUbisoftTokenUsed(usedAccount.id, ticket.userId, ticket.username, ticket.id);
+                            } catch (e) {}
+
+                            // Activation logging
+                            if (db.logUbisoftActivation) {
+                                try {
+                                    db.logUbisoftActivation(
+                                        usedAccount.id,
+                                        usedAccount.account_id || tokenData.account_id,
+                                        ticket.gameId,
+                                        ticket.userId,
+                                        ticket.username,
+                                        ticket.id,
+                                        true,
+                                        null
+                                    );
+                                } catch (e) {}
+                            }
+
+                            try { updateUbisoftPanel(); } catch (e) {}
+
+                            resolve({
+                                success: true,
+                                tokenFile: tokenOutputFile,
+                                output: content.substring(0, 500),
+                                accountUsed: usedAccount.email
+                            });
+
+                        } else {
+                            resolve({ success: false, error: 'Token file is empty or invalid' });
+                        }
+
+                    } else {
+
+                        // Fallback: dbdata.json
+                        const dbdataFile = path.join(config.tokenOutputPath, 'dbdata.json');
+
+                        if (fs.existsSync(dbdataFile)) {
+                            try {
+                                db.markUbisoftTokenUsed(tokenData.id, ticket.userId, ticket.username, ticket.id);
+                            } catch (e) {}
+
+                            if (db.logUbisoftActivation) {
+                                try {
+                                    db.logUbisoftActivation(
+                                        tokenData.id,
+                                        tokenData.account_id,
+                                        ticket.gameId,
+                                        ticket.userId,
+                                        ticket.username,
+                                        ticket.id,
+                                        true,
+                                        null
+                                    );
+                                } catch (e) {}
+                            }
+
+                            try { updateUbisoftPanel(); } catch (e) {}
+
+                            resolve({
+                                success: true,
+                                tokenFile: dbdataFile
+                            });
+
+                        } else {
+
+                            // Log failed activation
+                            if (db.logUbisoftActivation) {
+                                try {
+                                    db.logUbisoftActivation(
+                                        tokenData.id,
+                                        tokenData.account_id,
+                                        ticket.gameId,
+                                        ticket.userId,
+                                        ticket.username,
+                                        ticket.id,
+                                        false,
+                                        stderr || stdout || 'No token file generated'
+                                    );
+                                } catch (e) {}
+                            }
+
+                            resolve({
+                                success: false,
+                                error: stderr || stdout || 'No token file generated'
+                            });
+                        }
+                    }
+
+                }, 2000);
+            });
+
+            process.on('error', (err) => {
+                clearTimeout(timeout);
+                resolve({ success: false, error: err.message });
+            });
+
+        } catch (error) {
+            resolve({ success: false, error: error.message });
+        }
+    });
+}
+
+// ============================================================================
+// RESPONSE HANDLERS
+// ============================================================================
+
+async function handleUbisoftItWorks(interaction, ticketId) {
+    const ticket = activeUbisoftTickets.get(ticketId);
+    if (!ticket) return interaction.reply({ content: '❌ Ticket not found.', ephemeral: true }).catch(() => {});
+    if (interaction.user.id !== ticket.userId) return interaction.reply({ content: '❌ Not your ticket.', ephemeral: true }).catch(() => {});
+    
+    try { await interaction.deferUpdate(); } catch (e) {}
+    
+    clearAllTicketTimers(ticket.id);
+    
+    const member = await interaction.guild.members.fetch(ticket.userId).catch(() => null);
+    const baseCooldownHours = getCooldownHours(member);
+    const game = db.getUbisoftGame(ticket.gameId);
+    
+    // Apply cooldowns
+    if (baseCooldownHours > 0) {
+        db.setCooldown(ticket.userId, interaction.guild.id, 'ticket', baseCooldownHours);
+        await logCooldownEvent(interaction.guild.id, ticket.userId, ticket.username, 'applied', 'ticket', baseCooldownHours, 'System (auto)', null);
+    }
+    
+    if (game?.demand_type === 'high' && !isExemptFromHighDemand(member)) {
+        db.setCooldown(ticket.userId, interaction.guild.id, 'high_demand', 168);
+        await logCooldownEvent(interaction.guild.id, ticket.userId, ticket.username, 'applied', 'high_demand', 168, 'System (auto)', null);
+    }
+    
+    const successEmbed = new EmbedBuilder()
+        .setColor(0x00FF00)
+        .setTitle('🎉 Awesome! Enjoy your game!')
+        .setDescription('Thank you for using our service!\n\n*Ticket will close in 1 minute.*');
+    
+    const reviewButton = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setLabel('Leave a Review ⭐')
+            .setEmoji('⭐')
+            .setStyle(ButtonStyle.Link)
+            .setURL(`https://discord.com/channels/${interaction.guild.id}/${config.reviewChannelId}`)
+    );
+    
+    await interaction.channel.send({ embeds: [successEmbed], components: [reviewButton] }).catch(() => {});
+    
+    ticket.status = 'closing';
+    
+    const duration = ticket.createdAt ? Math.round((Date.now() - ticket.createdAt) / 60000) : 0;
+    
+    await logTicketEvent(ticket, 'success', { reason: 'User confirmed working', duration: `${duration} min` });
+    await logActivation(ticket, duration);
+    
+    // Close after 1 minute
+    setTimeout(async () => {
+        await closeUbisoftTicket(ticket.id, 'success', interaction.channel);
+    }, 60000);
+}
+
+async function handleUbisoftTokenHelp(interaction, ticketId) {
+    const ticket = activeUbisoftTickets.get(ticketId);
+    if (!ticket) return interaction.reply({ content: '❌ Ticket not found.', ephemeral: true }).catch(() => {});
+    
+    try { await interaction.deferUpdate(); } catch (e) {}
+    
+    // Cancel all timers
+    clearAllTicketTimers(ticket.id);
+    
+    ticket.status = 'needs_help';
+    ticket.helpRequested = true;
+    
+    // Disable the buttons
+    try {
+        const disabledRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder().setCustomId(`ubisoft_it_works_${ticket.id}`).setLabel('It Works!').setEmoji('✅').setStyle(ButtonStyle.Success).setDisabled(true),
+            new ButtonBuilder().setCustomId(`ubisoft_token_help_${ticket.id}`).setLabel('Need Help').setEmoji('🆘').setStyle(ButtonStyle.Danger).setDisabled(true)
+        );
+        await interaction.message.edit({ components: [disabledRow] });
+    } catch (e) {}
+    
+    // Ping staff
+    await interaction.channel.send({ 
+        content: getStaffMention(ticket.guildId), 
+        embeds: [new EmbedBuilder()
+            .setColor(0xFF0000)
+            .setTitle('🆘 [UBISOFT] Help Requested After Token')
+            .addFields(
+                { name: '🎮 Game', value: ticket.gameName, inline: true },
+                { name: '👤 User', value: `<@${ticket.userId}>`, inline: true }
+            )
+        ] 
+    });
+    
+    await interaction.channel.send({
+        content: `<@${ticket.userId}>`,
+        embeds: [new EmbedBuilder()
+            .setColor(0xFFA500)
+            .setTitle('⏳ Staff Notified')
+            .setDescription('A staff member will assist you shortly.\nPlease describe your issue below.')
+        ]
+    }).catch(() => {});
+    
+    await logTicketEvent(ticket, 'step_change', { step: 'Help requested after token' });
+}
+
+// ============================================================================
+// CLOSE TICKET
+// ============================================================================
+
+async function closeUbisoftTicket(ticketId, reason, channel) {
+    const ticket = activeUbisoftTickets.get(ticketId);
+    if (!ticket) return;
+    
+    clearAllTicketTimers(ticketId);
+    
+    // Remove from queue if present
+    const queueIndex = tokenQueue.findIndex(e => e.ticketId === ticketId);
+    if (queueIndex !== -1) {
+        tokenQueue.splice(queueIndex, 1);
+    }
+    
+    console.log(`[Ubisoft] Closing ${ticketId} - ${reason}`);
+    
+    const duration = ticket.createdAt ? Math.round((Date.now() - ticket.createdAt) / 60000) : 0;
+    
+    const eventType = reason === 'success' ? 'success' : 
+                      reason.includes('timeout') ? 'timeout' :
+                      reason.includes('ghost') ? 'ghosted' :
+                      reason.includes('user_closed') ? 'cancelled' : 'closed';
+    
+    await logTicketEvent(ticket, eventType, { reason, duration: `${duration} min` });
+    
+    // Save transcript messages before deleting
+    try {
+        const thread = await client.channels.fetch(ticket.threadId);
+        if (thread) {
+            const messages = await thread.messages.fetch({ limit: 100 });
+            const messagesArray = [];
+            
+            messages.forEach(msg => {
+                messagesArray.push({
+                    author: msg.author?.username || 'Unknown',
+                    authorId: msg.author?.id,
+                    content: msg.content || '',
+                    timestamp: msg.createdTimestamp,
+                    isBot: msg.author?.bot || false,
+                    isStaff: msg.member?.roles?.cache?.some(r => {
+                        const name = r.name.toLowerCase();
+                        return name.includes('staff') || name.includes('mod') || name.includes('admin');
+                    }) || false,
+                    attachments: msg.attachments.map(a => ({
+                        name: a.name,
+                        url: a.url,
+                        size: a.size
+                    }))
+                });
+            });
+            
+            // Sort by timestamp (oldest first)
+            messagesArray.sort((a, b) => a.timestamp - b.timestamp);
+            
+            // Save to database
+            if (db.saveUbisoftTranscript) {
+                db.saveUbisoftTranscript(
+                    ticketId,
+                    ticket.threadId,
+                    ticket.userId,
+                    ticket.username,
+                    ticket.gameName,
+                    JSON.stringify(messagesArray)
+                );
+                console.log(`[Ubisoft] Saved transcript for ${ticketId} with ${messagesArray.length} messages`);
+            }
+        }
+    } catch (err) {
+        console.error(`[Ubisoft] Error saving transcript: ${err.message}`);
+    }
+    
+    if (db.closeUbisoftTicket) db.closeUbisoftTicket(ticketId, reason);
+    
+    activeUbisoftTickets.delete(ticketId);
+    
+    try { 
+        const thread = await client.channels.fetch(ticket.threadId); 
+        if (thread) await thread.delete(); 
+    } catch (err) {}
+    
+    await updateUbisoftPanel();
+}
+
+// ============================================================================
+// STAFF ACTIONS
+// ============================================================================
+
+async function handleUbisoftStaffApprove(interaction, ticketId) {
+    const ticket = activeUbisoftTickets.get(ticketId);
+    if (!ticket) return interaction.editReply({ content: '❌ Ticket not found.' });
+    
+    const game = db.getUbisoftGame(ticket.gameId);
+    
+    await logTicketEvent(ticket, 'staff_action', { staffMember: interaction.user.username, reason: 'Approved screenshots' });
+    
+    await interaction.message.edit({
+        embeds: [new EmbedBuilder().setColor(0x00FF00).setTitle('✅ Approved by Staff').setDescription(`Approved by ${interaction.user.username}`)],
+        components: []
+    });
+    
+    await interaction.editReply({ content: '✅ Approved!' });
+    
+    // Show instructions and download
+    await showInstructionsAndDownload(interaction, ticket, game);
+}
+
+async function handleUbisoftStaffReject(interaction, ticketId) {
+    const ticket = activeUbisoftTickets.get(ticketId);
+    if (!ticket) return interaction.editReply({ content: '❌ Ticket not found.' });
+    
+    ticket.status = 'awaiting_screenshot';
+    
+    await logTicketEvent(ticket, 'staff_action', { staffMember: interaction.user.username, reason: 'Rejected screenshots' });
+    
+    await interaction.message.edit({
+        embeds: [new EmbedBuilder().setColor(0xFF0000).setTitle('❌ Rejected by Staff').setDescription(`Rejected by ${interaction.user.username}\n\nPlease upload new screenshots.`)],
+        components: []
+    });
+    
+    await interaction.editReply({ content: '❌ Rejected.' });
+    startScreenshotTimer(ticket.id, interaction.channel);
+}
+
+// ============================================================================
+// BUTTON HANDLER
+// ============================================================================
+
+async function handleUbisoftButton(interaction) {
+    const id = interaction.customId;
+    
+    try {
+        // Panel buttons
+        if (id === 'ubisoft_refresh_panel') {
+            await interaction.deferReply({ ephemeral: true });
+            await updateUbisoftPanel();
+            const games = db.getAllUbisoftGames();
+            const total = games.reduce((sum, g) => sum + db.getAvailableUbisoftTokenCount(g.id), 0);
+            await interaction.editReply({ content: `✅ Refreshed! (${total} tokens)` });
+            return;
+        }
+        
+        if (id === 'ubisoft_view_high_demand') {
+            const games = db.getAllUbisoftGames().filter(g => g.demand_type === 'high');
+            const list = games.length > 0 ? games.map(g => `• ${g.game_name}`).join('\n') : 'None.';
+            await interaction.reply({
+                embeds: [new EmbedBuilder().setColor(0xFF4500).setTitle('🔥 High Demand Games').setDescription(list)],
+                ephemeral: true
+            });
+            return;
+        }
+        
+        if (id === 'ubisoft_view_rules') {
+            await interaction.reply({
+                embeds: [new EmbedBuilder().setColor(0x5865F2).setTitle('📋 Rules')
+                    .addFields(
+                        { name: '⏱️ Cooldowns', value: '🥇 Gold - 0h\n🥈 Silver/Bronze - 24h\n💝 Donator - 48h\n👤 Free - 48h', inline: true },
+                        { name: '🔥 High Demand', value: 'Free: +7 days', inline: true },
+                        { name: '🚨 Important', value: '```• Never use Ubisoft Connect\n• Never update game files```', inline: false }
+                    )],
+                ephemeral: true
+            });
+            return;
+        }
+        
+        // Extract ticket ID
+        let ticketId = null;
+        let ticket = null;
+        
+        const prefixes = [
+            'ubisoft_close_', 'ubisoft_it_works_', 'ubisoft_token_help_',
+            'ubisoft_need_help_', 'ubisoft_submit_screenshots_', 'ubisoft_clear_screenshots_',
+            'ubisoft_linux_mac_', 'ubisoft_linux_submit_',
+            'ubisoft_staff_approve_', 'ubisoft_staff_reject_'
+        ];
+        
+        for (const prefix of prefixes) {
+            if (id.startsWith(prefix)) {
+                ticketId = id.replace(prefix, '');
+                ticket = activeUbisoftTickets.get(ticketId);
+                break;
+            }
+        }
+        
+        // Staff buttons
+        if (id.startsWith('ubisoft_staff_approve_')) {
+            await interaction.deferReply({ ephemeral: true });
+            if (!isStaff(interaction)) { await interaction.editReply({ content: '❌ Staff only.' }); return; }
+            await handleUbisoftStaffApprove(interaction, ticketId);
+            return;
+        }
+        
+        if (id.startsWith('ubisoft_staff_reject_')) {
+            await interaction.deferReply({ ephemeral: true });
+            if (!isStaff(interaction)) { await interaction.editReply({ content: '❌ Staff only.' }); return; }
+            await handleUbisoftStaffReject(interaction, ticketId);
+            return;
+        }
+        
+        // Recover ticket if needed
+        if (ticketId && !ticket) {
+            ticket = getTicketFromChannel(interaction.channel?.id, interaction.guildId);
+            if (!ticket) {
+                await interaction.reply({ content: '❌ Ticket expired.', ephemeral: true });
+                return;
+            }
+        }
+        
+        // Permission check
+        if (ticket) {
+            const isOwner = interaction.user.id === ticket.userId;
+            const staffMember = isStaff(interaction);
+            if (!isOwner && !staffMember) {
+                await interaction.reply({ content: '❌ Not your ticket.', ephemeral: true });
+                return;
+            }
+        }
+        
+        // Handle buttons
+        if (id.startsWith('ubisoft_close_')) {
+            // STAFF ONLY - Users cannot close tickets
+            if (!isStaff(interaction)) {
+                await interaction.reply({ content: '❌ Only staff can close tickets.', ephemeral: true });
+                return;
+            }
+            await interaction.deferReply({ ephemeral: true });
+            await interaction.editReply({ content: '✅ Closing...' });
+            await closeUbisoftTicket(ticketId, 'staff_closed', interaction.channel);
+        }
+        else if (id.startsWith('ubisoft_need_help_')) {
+            await interaction.deferReply({ ephemeral: true });
+            if (ticket.helpRequested) { await interaction.editReply({ content: '⚠️ Already requested!' }); return; }
+            ticket.helpRequested = true;
+            
+            await interaction.editReply({ content: '✅ Staff notified!' });
+            
+            const game = db.getUbisoftGame(ticket.gameId);
+            
+            await interaction.channel.send({
+                content: `<@${ticket.userId}>`,
+                embeds: [new EmbedBuilder().setColor(0xFFA500).setTitle('💬 Describe Your Issue').setDescription('Staff has been notified. Please explain your problem below.')]
+            });
+            
+            await interaction.channel.send({ 
+                content: getStaffMention(ticket.guildId), 
+                embeds: [new EmbedBuilder()
+                    .setColor(0xFF0000)
+                    .setTitle('🆘 [UBISOFT] Help Requested')
+                    .addFields(
+                        { name: '🎮 Game', value: game?.game_name || 'Unknown', inline: true },
+                        { name: '📋 Status', value: ticket.status, inline: true },
+                        { name: '👤 User', value: `<@${ticket.userId}>`, inline: true }
+                    )
+                ] 
+            });
+            
+            await logTicketEvent(ticket, 'step_change', { step: 'Help requested' });
+        }
+        else if (id.startsWith('ubisoft_linux_mac_')) {
+            ticket.status = 'awaiting_linux_screenshot';
+            ticket.isLinuxMac = true;
+            ticket.collectedScreenshots = [];
+            
+            clearTicketTimer(ticket.id, 'screenshot');
+            
+            const game = db.getUbisoftGame(ticket.gameId);
+            
+            const embed = new EmbedBuilder()
+                .setColor(0x9B59B6)
+                .setTitle('🐧 Linux/Mac User')
+                .setDescription('Upload screenshots showing your game installation:')
+                .addFields(
+                    { name: '📋 Required', value: '• Game folder with files visible\n• Proof of installation', inline: false },
+                    { name: '🎮 Game', value: game?.game_name || ticket.gameName, inline: true },
+                    { name: '⏱️ Time Limit', value: '10 minutes', inline: true }
+                );
+            
+            const buttons = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`ubisoft_need_help_${ticket.id}`).setLabel('Help').setEmoji('🆘').setStyle(ButtonStyle.Danger),
+                new ButtonBuilder().setCustomId(`ubisoft_close_${ticket.id}`).setLabel('Close').setEmoji('🚪').setStyle(ButtonStyle.Secondary)
+            );
+            
+            await interaction.update({ embeds: [embed], components: [buttons] });
+            startScreenshotTimer(ticket.id, interaction.channel);
+            
+            await logTicketEvent(ticket, 'step_change', { step: 'Linux/Mac mode' });
+        }
+        else if (id.startsWith('ubisoft_it_works_')) {
+            await handleUbisoftItWorks(interaction, ticketId);
+        }
+        else if (id.startsWith('ubisoft_token_help_')) {
+            await handleUbisoftTokenHelp(interaction, ticketId);
+        }
+        else if (id.startsWith('ubisoft_submit_screenshots_')) {
+            if (!ticket.collectedScreenshots?.length) { await interaction.reply({ content: '❌ No screenshots.', ephemeral: true }); return; }
+            if (ticket.processingScreenshots) { await interaction.reply({ content: '⏳ Processing...', ephemeral: true }); return; }
+            if (ticket.status === 'awaiting_staff') { await interaction.reply({ content: '⏳ Being reviewed.', ephemeral: true }); return; }
+            await processUbisoftScreenshots(interaction, ticketId);
+        }
+        else if (id.startsWith('ubisoft_linux_submit_')) {
+            if (!ticket.collectedScreenshots?.length) { await interaction.reply({ content: '❌ No screenshots.', ephemeral: true }); return; }
+            if (ticket.status === 'awaiting_staff') { await interaction.reply({ content: '⏳ Already sent.', ephemeral: true }); return; }
+            
+            ticket.status = 'awaiting_staff';
+            const game = db.getUbisoftGame(ticket.gameId);
+            const urls = ticket.collectedScreenshots.map(s => s.url);
+            
+            clearTicketTimer(ticket.id, 'screenshot');
+            
+            const userEmbed = new EmbedBuilder().setColor(0x9B59B6).setTitle('📤 Sent for Review').setDescription('Staff will verify. Please wait.');
+            await interaction.update({ embeds: [userEmbed], components: [] });
+            
+            const staffEmbed = new EmbedBuilder()
+                .setColor(0x9B59B6)
+                .setTitle('🐧 [UBISOFT] Linux/Mac Review')
+                .addFields(
+                    { name: '🎮 Game', value: game?.game_name || ticket.gameName, inline: true },
+                    { name: '📸 Screenshots', value: `${urls.length}`, inline: true }
+                )
+                .setImage(urls[0]);
+            
+            const staffButtons = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId(`ubisoft_staff_approve_${ticket.id}`).setLabel('Approve').setEmoji('✅').setStyle(ButtonStyle.Success),
+                new ButtonBuilder().setCustomId(`ubisoft_staff_reject_${ticket.id}`).setLabel('Reject').setEmoji('❌').setStyle(ButtonStyle.Danger)
+            );
+            
+            await interaction.channel.send({ content: getStaffMention(ticket.guildId), embeds: [staffEmbed], components: [staffButtons] });
+            
+            await logTicketEvent(ticket, 'step_change', { step: 'Linux/Mac sent for review' });
+        }
+        else if (id.startsWith('ubisoft_clear_screenshots_')) {
+            ticket.collectedScreenshots = [];
+            ticket.submitMessageId = null;
+            await interaction.update({ embeds: [new EmbedBuilder().setColor(0xFF6600).setTitle('🗑️ Screenshots Cleared').setDescription('Upload new screenshots.')], components: [] });
+            startScreenshotTimer(ticketId, interaction.channel);
+        }
+        
+    } catch (err) {
+        console.error('[Ubisoft] Button error:', err);
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: '❌ Error.', ephemeral: true }).catch(() => {});
+        }
+    }
+}
+
+// ============================================================================
+// SLASH COMMANDS
+// ============================================================================
+
+const commands = [
+    new SlashCommandBuilder()
+        .setName('ubisoft-setup')
+        .setDescription('Create Ubisoft panel + set ticket channel')
+        .addStringOption(o => o.setName('type').setDescription('Panel type').setRequired(true)
+            .addChoices({ name: 'Free', value: 'free' }, { name: 'Paid', value: 'paid' }))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-panel')
+        .setDescription('Create panel in current channel')
+        .addStringOption(o => o.setName('type').setDescription('Type').setRequired(true)
+            .addChoices({ name: 'Free', value: 'free' }, { name: 'Paid', value: 'paid' }))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-approve')
+        .setDescription('Approve screenshots manually')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageThreads),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-closeticket')
+        .setDescription('Close ticket')
+        .addStringOption(o => o.setName('reason').setDescription('Reason'))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageThreads),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-queue')
+        .setDescription('View token generation queue')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageThreads),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-status')
+        .setDescription('Token availability')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-mystatus')
+        .setDescription('Your cooldown status'),
+    
+    // NEW V2.3 Commands
+    new SlashCommandBuilder()
+        .setName('ubisoft-history')
+        .setDescription('View user activation history')
+        .addUserOption(o => o.setName('user').setDescription('User to check').setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageThreads),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-viewcooldown')
+        .setDescription('View user cooldowns')
+        .addUserOption(o => o.setName('user').setDescription('User to check').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageThreads),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-generate')
+        .setDescription('Manually generate token for user')
+        .addUserOption(o => o.setName('user').setDescription('User').setRequired(true))
+        .addIntegerOption(o => o.setName('game').setDescription('Game ID').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-removecooldown')
+        .setDescription('Remove user cooldown')
+        .addUserOption(o => o.setName('user').setDescription('User').setRequired(true))
+        .addStringOption(o => o.setName('type').setDescription('Cooldown type').setRequired(true)
+            .addChoices({ name: 'Ticket', value: 'ticket' }, { name: 'High Demand', value: 'high_demand' }, { name: 'All', value: 'all' }))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-refresh')
+        .setDescription('Force refresh all panels')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+    
+    // NEW V2.3.1 Commands
+    new SlashCommandBuilder()
+        .setName('ubisoft-setstaffroles')
+        .setDescription('Set staff roles for Ubisoft bot')
+        .addStringOption(o => o.setName('roles').setDescription('Role IDs separated by commas').setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-override')
+        .setDescription('Override and approve ticket, bypassing cooldowns')
+        .addUserOption(o => o.setName('user').setDescription('User to override for').setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    
+    new SlashCommandBuilder()
+        .setName('ubisoft-redo')
+        .setDescription('Retry token generation for current ticket')
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageThreads),
+];
+
+async function registerCommands() {
+    try {
+        if (!config.guildId) { console.error('[Ubisoft] No GUILD_ID'); return; }
+        const rest = new REST({ version: '10' }).setToken(config.token);
+        await rest.put(Routes.applicationGuildCommands(client.user.id, config.guildId), { body: commands.map(c => c.toJSON()) });
+        console.log(`[Ubisoft] ✅ ${commands.length} commands registered`);
+    } catch (error) {
+        console.error('[Ubisoft] Command registration error:', error.message);
+    }
+}
+
+// ============================================================================
+// COMMAND HANDLER
+// ============================================================================
+
+async function handleCommand(interaction) {
+    const { commandName } = interaction;
+    
+    const staffCommands = ['ubisoft-approve', 'ubisoft-closeticket', 'ubisoft-queue', 'ubisoft-history', 'ubisoft-viewcooldown', 'ubisoft-generate', 'ubisoft-removecooldown', 'ubisoft-refresh', 'ubisoft-setstaffroles', 'ubisoft-override', 'ubisoft-redo'];
+    
+    if (staffCommands.includes(commandName) && !isStaff(interaction)) {
+        return interaction.reply({ content: '❌ Staff only.', ephemeral: true });
+    }
+    
+    try {
+        await interaction.deferReply({ ephemeral: true });
+        
+        if (commandName === 'ubisoft-setup') {
+            const panelType = interaction.options.getString('type') || 'free';
+            if (db.setUbisoftTicketChannel) db.setUbisoftTicketChannel(interaction.guild.id, interaction.channel.id);
+            await interaction.editReply({ content: '📋 Creating panel...' });
+            await createUbisoftPanel(interaction.channel, panelType);
+            await interaction.editReply({ content: `✅ ${panelType} panel created!` });
+        }
+        else if (commandName === 'ubisoft-panel') {
+            const panelType = interaction.options.getString('type');
+            await createUbisoftPanel(interaction.channel, panelType);
+            await interaction.editReply({ content: '✅ Panel created!' });
+        }
+        else if (commandName === 'ubisoft-approve') {
+            const ticket = getTicketFromChannel(interaction.channel?.id, interaction.guildId);
+            if (!ticket) { await interaction.editReply({ content: '❌ No ticket found.' }); return; }
+            
+            const game = db.getUbisoftGame(ticket.gameId);
+            
+            await logTicketEvent(ticket, 'staff_action', { staffMember: interaction.user.username, reason: 'Manual approval' });
+            
+            // Show instructions
+            await showInstructionsAndDownload(interaction, ticket, game);
+            
+            await interaction.editReply({ content: '✅ Approved!' });
+        }
+        else if (commandName === 'ubisoft-closeticket') {
+            const reason = interaction.options.getString('reason') || 'Closed by staff';
+            const ticket = getTicketFromChannel(interaction.channel?.id, interaction.guildId);
+            if (ticket) {
+                await interaction.editReply({ content: '✅ Closing...' });
+                await closeUbisoftTicket(ticket.id, reason, interaction.channel);
+            } else {
+                await interaction.editReply({ content: '⚠️ No ticket found.' });
+            }
+        }
+        else if (commandName === 'ubisoft-queue') {
+            if (tokenQueue.length === 0) {
+                await interaction.editReply({ content: '📊 Queue is empty.' });
+            } else {
+                const queueList = tokenQueue.map((e, i) => {
+                    const t = activeUbisoftTickets.get(e.ticketId);
+                    return `${i + 1}. ${t?.gameName || 'Unknown'} - <@${t?.userId || 'Unknown'}>`;
+                }).join('\n');
+                
+                await interaction.editReply({
+                    embeds: [new EmbedBuilder()
+                        .setColor(0x5865F2)
+                        .setTitle('📊 Token Generation Queue')
+                        .setDescription(queueList)
+                        .addFields({ name: 'Processing', value: isProcessingQueue ? 'Yes' : 'No', inline: true })
+                    ]
+                });
+            }
+        }
+        else if (commandName === 'ubisoft-status') {
+            const games = db.getAllUbisoftGames();
+            let statusText = '**Ubisoft Token Status:**\n\n';
+            games.forEach(game => {
+                const available = db.getAvailableUbisoftTokenCount(game.id);
+                const total = db.getTotalUbisoftTokenCount ? db.getTotalUbisoftTokenCount(game.id) : available;
+                statusText += `${available > 0 ? '🟢' : '🔴'} **${game.game_name}**: ${available}/${total}\n`;
+            });
+            await interaction.editReply({ content: statusText });
+        }
+        else if (commandName === 'ubisoft-mystatus') {
+            const userId = interaction.user.id;
+            
+            const ticketCooldown = db.getUniversalCooldown(userId, 'ticket');
+            const hdCooldown = db.getUniversalCooldown(userId, 'high_demand');
+            
+            const embed = new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('📊 Your Status')
+                .setTimestamp();
+            
+            let cooldownText = '';
+            if (ticketCooldown) {
+                const expiresAt = new Date(ticketCooldown.expires_at);
+                if (expiresAt > new Date()) {
+                    cooldownText += `⏰ **Ticket:** <t:${Math.floor(expiresAt.getTime() / 1000)}:R>\n`;
+                }
+            }
+            if (hdCooldown) {
+                const expiresAt = new Date(hdCooldown.expires_at);
+                if (expiresAt > new Date()) {
+                    cooldownText += `🔥 **High Demand:** <t:${Math.floor(expiresAt.getTime() / 1000)}:R>\n`;
+                }
+            }
+            
+            embed.addFields({ 
+                name: '⏱️ Cooldowns (Shared with Steam)', 
+                value: cooldownText || '✅ No active cooldowns!', 
+                inline: false 
+            });
+            
+            await interaction.editReply({ embeds: [embed] });
+        }
+        // NEW V2.3 Commands
+        else if (commandName === 'ubisoft-history') {
+            const targetUser = interaction.options.getUser('user') || interaction.user;
+            
+            const activations = db.getUbisoftUserActivations ? 
+                db.getUbisoftUserActivations(targetUser.id, 15) : [];
+            
+            if (activations.length === 0) {
+                await interaction.editReply({ content: `📋 No Ubisoft activation history found for ${targetUser.username}.` });
+                return;
+            }
+            
+            const historyText = activations.map((a, i) => {
+                const status = a.success ? '✅' : '❌';
+                const date = new Date(a.activated_at).toLocaleDateString();
+                return `${status} **${a.game_name || 'Unknown'}** - ${date}`;
+            }).join('\n');
+            
+            const embed = new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle(`🎯 Ubisoft History: ${targetUser.username}`)
+                .setDescription(historyText)
+                .setFooter({ text: `Showing last ${activations.length} activations` })
+                .setTimestamp();
+            
+            await interaction.editReply({ embeds: [embed] });
+        }
+        else if (commandName === 'ubisoft-viewcooldown') {
+            const targetUser = interaction.options.getUser('user');
+            
+            const ticketCooldown = db.getUniversalCooldown(targetUser.id, 'ticket');
+            const hdCooldown = db.getUniversalCooldown(targetUser.id, 'high_demand');
+            
+            let cooldownText = '';
+            if (ticketCooldown) {
+                const expiresAt = new Date(ticketCooldown.expires_at);
+                if (expiresAt > new Date()) {
+                    cooldownText += `⏰ **Ticket:** <t:${Math.floor(expiresAt.getTime() / 1000)}:R> (<t:${Math.floor(expiresAt.getTime() / 1000)}:f>)\n`;
+                }
+            }
+            if (hdCooldown) {
+                const expiresAt = new Date(hdCooldown.expires_at);
+                if (expiresAt > new Date()) {
+                    cooldownText += `🔥 **High Demand:** <t:${Math.floor(expiresAt.getTime() / 1000)}:R> (<t:${Math.floor(expiresAt.getTime() / 1000)}:f>)\n`;
+                }
+            }
+            
+            const embed = new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle(`⏱️ Cooldowns: ${targetUser.username}`)
+                .setDescription(cooldownText || '✅ No active cooldowns!')
+                .setFooter({ text: 'Cooldowns are shared between Steam and Ubisoft' })
+                .setTimestamp();
+            
+            await interaction.editReply({ embeds: [embed] });
+        }
+        else if (commandName === 'ubisoft-removecooldown') {
+            const targetUser = interaction.options.getUser('user');
+            const cooldownType = interaction.options.getString('type');
+            
+            if (cooldownType === 'all') {
+                db.removeAllUserCooldowns(targetUser.id);
+                await logCooldownEvent(interaction.guild.id, targetUser.id, targetUser.username, 'removed', 'all', null, interaction.user.username, interaction.user.id);
+                await interaction.editReply({ content: `✅ Removed ALL cooldowns from ${targetUser.username}` });
+            } else {
+                db.removeCooldown(targetUser.id, interaction.guild.id, cooldownType);
+                await logCooldownEvent(interaction.guild.id, targetUser.id, targetUser.username, 'removed', cooldownType, null, interaction.user.username, interaction.user.id);
+                await interaction.editReply({ content: `✅ Removed ${cooldownType} cooldown from ${targetUser.username}` });
+            }
+        }
+        else if (commandName === 'ubisoft-generate') {
+            const targetUser = interaction.options.getUser('user');
+            const gameId = interaction.options.getInteger('game');
+            
+            const game = db.getUbisoftGame(gameId);
+            if (!game) {
+                await interaction.editReply({ content: '❌ Game not found.' });
+                return;
+            }
+            
+            const available = db.getAvailableUbisoftTokenCount(gameId);
+            if (available === 0) {
+                await interaction.editReply({ content: `❌ No tokens available for ${game.game_name}` });
+                return;
+            }
+            
+            // Create a manual ticket for generation
+            const ticketId = `UBI-MANUAL-${Date.now().toString(36).toUpperCase()}`;
+            const manualTicket = {
+                id: ticketId,
+                userId: targetUser.id,
+                username: targetUser.username,
+                gameId: gameId,
+                gameName: game.game_name,
+                guildId: interaction.guild.id,
+                status: 'manual_generation',
+                tokenRequestContent: 'MANUAL_GENERATION',
+                createdAt: Date.now()
+            };
+            
+            activeUbisoftTickets.set(ticketId, manualTicket);
+            
+            await interaction.editReply({ content: `⏳ Generating token for ${targetUser.username} - ${game.game_name}...` });
+            
+            const result = await generateUbisoftToken(manualTicket);
+            
+            if (result.success) {
+                const embed = new EmbedBuilder()
+                    .setColor(0x00FF00)
+                    .setTitle('✅ Manual Token Generated')
+                    .addFields(
+                        { name: '👤 User', value: targetUser.username, inline: true },
+                        { name: '🎮 Game', value: game.game_name, inline: true },
+                        { name: '👮 Staff', value: interaction.user.username, inline: true }
+                    )
+                    .setTimestamp();
+                
+                await interaction.editReply({ embeds: [embed] });
+                
+                // Send token to user
+                try {
+                    const dmChannel = await targetUser.createDM();
+                    await dmChannel.send({
+                        content: `🎉 **Token Generated!**\n\nStaff has generated a Ubisoft token for **${game.game_name}**!\n\nDownload the attached file and follow the usual instructions.`,
+                        files: result.tokenFile ? [result.tokenFile] : []
+                    });
+                    await interaction.followUp({ content: `📬 Token sent to ${targetUser.username} via DM`, ephemeral: true });
+                } catch (e) {
+                    await interaction.followUp({ content: `⚠️ Could not DM user. Token file:`, files: result.tokenFile ? [result.tokenFile] : [], ephemeral: true });
+                }
+            } else {
+                await interaction.editReply({ content: `❌ Generation failed: ${result.error}` });
+            }
+            
+            activeUbisoftTickets.delete(ticketId);
+        }
+        else if (commandName === 'ubisoft-refresh') {
+            await updateUbisoftPanel();
+            await interaction.editReply({ content: '✅ Panels refreshed!' });
+        }
+        // NEW V2.3.1 Commands
+        else if (commandName === 'ubisoft-setstaffroles') {
+            const rolesInput = interaction.options.getString('roles');
+            const roleIds = rolesInput.split(',').map(r => r.trim()).filter(r => r.length > 0);
+            
+            if (roleIds.length === 0) {
+                await interaction.editReply({ content: '❌ No valid role IDs provided.' });
+                return;
+            }
+            
+            // Validate role IDs exist in the guild
+            const validRoles = [];
+            for (const roleId of roleIds) {
+                try {
+                    const role = await interaction.guild.roles.fetch(roleId);
+                    if (role) validRoles.push(roleId);
+                } catch (e) {}
+            }
+            
+            if (validRoles.length === 0) {
+                await interaction.editReply({ content: '❌ None of the provided role IDs are valid.' });
+                return;
+            }
+            
+            // Save to database
+            if (db.setServerStaffRoles) {
+                db.setServerStaffRoles(interaction.guild.id, validRoles);
+            }
+            
+            const roleNames = validRoles.map(id => `<@&${id}>`).join(', ');
+            await interaction.editReply({ content: `✅ Staff roles set to: ${roleNames}` });
+        }
+        else if (commandName === 'ubisoft-override') {
+            const targetUser = interaction.options.getUser('user');
+            const ticket = getTicketFromChannel(interaction.channel?.id, interaction.guildId);
+            
+            if (!ticket) {
+                await interaction.editReply({ content: '❌ No ticket found in this channel.' });
+                return;
+            }
+            
+            // Remove all cooldowns for the ticket user
+            const userId = targetUser ? targetUser.id : ticket.userId;
+            db.removeAllUserCooldowns(userId);
+            
+            const game = db.getUbisoftGame(ticket.gameId);
+            
+            await logTicketEvent(ticket, 'staff_action', { 
+                staffMember: interaction.user.username, 
+                reason: 'Override - Cooldowns cleared, proceeding to instructions' 
+            });
+            await logCooldownEvent(interaction.guild.id, userId, ticket.username, 'removed', 'all', null, interaction.user.username, interaction.user.id);
+            
+            // Jump to instructions phase
+            await showInstructionsAndDownload(interaction, ticket, game);
+            
+            await interaction.editReply({ content: `✅ Override complete! Cooldowns cleared, showing instructions to user.` });
+        }
+        else if (commandName === 'ubisoft-redo') {
+            const ticket = getTicketFromChannel(interaction.channel?.id, interaction.guildId);
+            
+            if (!ticket) {
+                await interaction.editReply({ content: '❌ No ticket found in this channel.' });
+                return;
+            }
+            
+            if (!ticket.tokenRequestContent) {
+                await interaction.editReply({ content: '❌ No token request file uploaded yet. Cannot redo.' });
+                return;
+            }
+            
+            const game = db.getUbisoftGame(ticket.gameId);
+            const available = db.getAvailableUbisoftTokenCount(ticket.gameId);
+            
+            if (available === 0) {
+                await interaction.editReply({ content: `❌ No tokens available for ${game?.game_name || 'this game'}` });
+                return;
+            }
+            
+            await interaction.editReply({ content: `⏳ Re-generating token for ${ticket.username} - ${game?.game_name}...` });
+            
+            ticket.status = 'processing';
+            
+            await logTicketEvent(ticket, 'staff_action', { 
+                staffMember: interaction.user.username, 
+                reason: 'Redo token generation' 
+            });
+            
+            const result = await generateUbisoftToken(ticket);
+            
+            if (result.success) {
+                ticket.status = 'token_sent';
+                
+                const successEmbed = new EmbedBuilder()
+                    .setColor(0x00FF00)
+                    .setTitle('🎉 Token Re-Generated!')
+                    .setDescription('Download the token file below.')
+                    .addFields(
+                        { name: '👮 Redo by', value: interaction.user.username, inline: true },
+                        { name: '🎮 Game', value: game?.game_name || 'Unknown', inline: true }
+                    );
+                
+                const responseButtons = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder().setCustomId(`ubisoft_it_works_${ticket.id}`).setLabel('It Works!').setEmoji('✅').setStyle(ButtonStyle.Success),
+                    new ButtonBuilder().setCustomId(`ubisoft_token_help_${ticket.id}`).setLabel('Need Help').setEmoji('🆘').setStyle(ButtonStyle.Danger)
+                );
+                
+                await interaction.channel.send({
+                    content: `<@${ticket.userId}> 🎉 **Token re-generated!**`,
+                    embeds: [successEmbed],
+                    components: [responseButtons]
+                });
+                
+                if (result.tokenFile && fs.existsSync(result.tokenFile)) {
+                    await interaction.channel.send({ 
+                        content: '📁 **Your Token File:**', 
+                        files: [result.tokenFile] 
+                    });
+                }
+                
+                await interaction.followUp({ content: '✅ Token re-generated successfully!', ephemeral: true });
+                
+                startResponseTimer(ticket.id, interaction.channel);
+            } else {
+                await interaction.followUp({ content: `❌ Redo failed: ${result.error}`, ephemeral: true });
+            }
+        }
+        
+    } catch (err) {
+        console.error('[Ubisoft] Command error:', err);
+        await interaction.editReply({ content: '❌ Error.' }).catch(() => {});
+    }
+}
+
+// ============================================================================
+// EVENT HANDLERS
+// ============================================================================
+
+client.once('ready', async () => {
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🎯 UBISOFT BOT V2.3.1 - STAFF CONTROLS');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log(`✅ Logged in as: ${client.user.tag}`);
+    console.log('');
+    console.log('📋 FLOW:');
+    console.log('   1. Screenshots (10 min timer)');
+    console.log('   2. AI Verify → Instructions + Download Link');
+    console.log('   3. Token Request TXT (30 min timer)');
+    console.log('   4. FIFO Queue Processing');
+    console.log('   5. Token.txt Delivery (30 min response timer)');
+    console.log('');
+    console.log('📋 V2.3 COMMANDS:');
+    console.log('   /ubisoft-history - View user history');
+    console.log('   /ubisoft-viewcooldown - Check user cooldowns');
+    console.log('   /ubisoft-generate - Manual token generation');
+    console.log('   /ubisoft-removecooldown - Remove cooldowns');
+    console.log('');
+    console.log('📋 V2.3.1 COMMANDS:');
+    console.log('   /ubisoft-setstaffroles - Set staff roles');
+    console.log('   /ubisoft-override - Override cooldowns & approve');
+    console.log('   /ubisoft-redo - Retry token generation');
+    console.log('');
+    console.log('⚠️ Users CANNOT close tickets - staff only!');
+    console.log('');
+    
+    try { db.initDatabase(); console.log('✅ Database ready'); } catch (err) { console.log('⚠️ Database:', err.message); }
+    
+    await registerCommands();
+    ensureDirectories();
+    
+    // Load panels
+    try {
+        const panels = db.getAllUbisoftPanels ? db.getAllUbisoftPanels() : [];
+        for (const panel of panels) {
+            try {
+                const channel = await client.channels.fetch(panel.panel_channel_id);
+                await channel.messages.fetch(panel.panel_message_id);
+                ubisoftPanels.set(panel.guild_id, {
+                    messageId: panel.panel_message_id,
+                    channelId: panel.panel_channel_id,
+                    type: panel.panel_type || 'free'
+                });
+                console.log(`✅ Panel loaded: ${panel.guild_id}`);
+            } catch (err) {}
+        }
+    } catch (err) {}
+    
+    client.user.setActivity('Ubisoft Games', { type: 3 });
+    
+    // Dynamic panel updates every 60 seconds
+    setInterval(updateUbisoftPanel, 60000);
+    
+    const games = db.getAllUbisoftGames ? db.getAllUbisoftGames() : [];
+    const totalAvail = games.reduce((sum, g) => sum + db.getAvailableUbisoftTokenCount(g.id), 0);
+    console.log(`📊 ${games.length} games, ${totalAvail} tokens`);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🚀 UBISOFT BOT V2.3.1 READY!');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+});
+
+client.on('interactionCreate', async (interaction) => {
+    try {
+        if (interaction.isChatInputCommand()) {
+            await handleCommand(interaction);
+        }
+        else if (interaction.isButton()) {
+            await handleUbisoftButton(interaction);
+        }
+        else if (interaction.isStringSelectMenu()) {
+            if (interaction.customId.startsWith('ubisoft_panel_')) {
+                const gameId = interaction.values[0].replace('ubisoft_game_', '');
+                await createUbisoftTicket(interaction, parseInt(gameId));
+            }
+        }
+    } catch (err) {
+        console.error('[Ubisoft] Interaction error:', err);
+        if (!interaction.replied && !interaction.deferred) {
+            interaction.reply({ content: '❌ Error.', ephemeral: true }).catch(() => {});
+        }
+    }
+});
+
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
+    if (!message.channel.isThread()) return;
+    
+    // Handle screenshots
+    if (message.attachments.size > 0) {
+        const hasImages = message.attachments.some(a => a.contentType?.startsWith('image/'));
+        const hasTxt = message.attachments.some(a => a.name?.toLowerCase().endsWith('.txt'));
+        
+        if (hasImages) {
+            await handleUbisoftScreenshot(message);
+        }
+        
+        if (hasTxt) {
+            await handleUbisoftTokenRequestFile(message);
+        }
+    }
+});
+
+// ============================================================================
+// STARTUP
+// ============================================================================
+
+if (!config.token) {
+    console.error('[Ubisoft] ❌ UBISOFT_BOT_TOKEN not set');
+    process.exit(1);
+}
+
+process.on('unhandledRejection', err => console.error('[Ubisoft] Unhandled rejection:', err));
+process.on('uncaughtException', err => console.error('[Ubisoft] Uncaught exception:', err));
+
+client.login(config.token).catch(err => {
+    console.error('[Ubisoft] ❌ Login failed:', err.message);
+    process.exit(1);
+});
+
+console.log('[Ubisoft] 🎯 Starting Ubisoft Bot V2.3.1...');

@@ -1,0 +1,35 @@
+{
+  "name": "bartender-bot-v2",
+  "version": "2.0.0",
+  "description": "Discord Token Bot - Complete Rewrite",
+  "main": "index.js",
+  "scripts": {
+    "start": "node startAll.js",
+    "bot": "node index.js",
+    "server": "node web/transcriptServer.js"
+  },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "better-sqlite3": "^12.4.6",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "express-session": "^1.18.2",
+    "multer": "^2.0.2",
+    "node-fetch": "^2.7.0",
+    "passport": "^0.6.0",
+    "passport-discord": "^0.1.4",
+    "session-file-store": "^1.5.0",
+    "sharp": "^0.34.5",
+    "sql.js": "^1.10.3",
+    "tesseract.js": "^6.0.1",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
