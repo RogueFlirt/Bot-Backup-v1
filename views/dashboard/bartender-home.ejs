@@ -1,0 +1,72 @@
+<%# Bartender Home - Limited access %>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Token Generator - Pub's Lounge</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; display: flex; flex-direction: column; }
+        
+        .header { padding: 20px 30px; background: #12121a; border-bottom: 1px solid #1a1a2e; display: flex; justify-content: space-between; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo span { font-size: 2rem; }
+        .logo h1 { font-size: 1.3rem; color: #e94560; }
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        .user-name { color: #888; }
+        .logout-btn { padding: 8px 16px; background: rgba(220,53,69,0.2); color: #dc3545; text-decoration: none; border-radius: 5px; font-size: 0.9rem; }
+        .logout-btn:hover { background: rgba(220,53,69,0.3); }
+        
+        .main { flex: 1; display: flex; justify-content: center; align-items: center; padding: 40px 20px; }
+        .container { width: 100%; max-width: 500px; }
+        
+        .card { background: #16213e; border: 1px solid #0f3460; border-radius: 12px; padding: 30px; }
+        .card-title { font-size: 1.3rem; margin-bottom: 25px; text-align: center; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .card-title .icon { font-size: 1.5rem; }
+        
+        .nav-btn { display: block; width: 100%; padding: 20px; margin-bottom: 15px; background: linear-gradient(135deg, #1b2838 0%, #2a475e 100%); border: 1px solid #66c0f4; border-radius: 8px; color: #fff; text-decoration: none; text-align: center; font-size: 1.1rem; transition: all 0.2s; }
+        .nav-btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(102,192,244,0.3); }
+        .nav-btn .icon { font-size: 1.5rem; display: block; margin-bottom: 8px; }
+        
+        .badge { display: inline-block; padding: 4px 10px; background: #1b2838; color: #66c0f4; border-radius: 4px; font-size: 0.8rem; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <span>🍺</span>
+            <h1>Pub's Lounge</h1>
+        </div>
+        <div class="user-info">
+            <span class="user-name">👤 <%= user.username %></span>
+            <a href="/dashboard/logout" class="logout-btn">Logout</a>
+        </div>
+    </div>
+    
+    <div class="main">
+        <div class="container">
+            <div class="card">
+                <div class="card-title">
+                    <span class="icon">🎮</span>
+                    Steam Token Generator
+                </div>
+                
+                <a href="/dashboard/steam/generate" class="nav-btn">
+                    <span class="icon">⬆️</span>
+                    Upload / Generate Tokens
+                </a>
+                
+                <a href="/dashboard/change-password" class="nav-btn" style="background: linear-gradient(135deg, #16213e 0%, #0f3460 100%); border-color: #0f3460;">
+                    <span class="icon">🔑</span>
+                    Change Password
+                </a>
+                
+                <div style="text-align: center;">
+                    <span class="badge">Bartender Access</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
