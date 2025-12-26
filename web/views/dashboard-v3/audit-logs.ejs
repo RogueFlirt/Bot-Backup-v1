@@ -1,0 +1,61 @@
+<%- include('partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title"><span class="icon">📋</span> Audit Logs</h1>
+    <div style="color: var(--text-muted); font-size: 14px;"><%= typeof totalCount !== 'undefined' ? totalCount : (logs ? logs.length : 0) %> total logs</div>
+</div>
+
+<!-- Search -->
+<div class="card" style="margin-bottom: 20px;">
+    <form method="GET" style="display: flex; gap: 12px; align-items: center;">
+        <input type="text" name="search" class="form-control" placeholder="🔍 Search username or user ID..." value="<%= typeof search !== 'undefined' ? search : '' %>" style="flex: 1;">
+        <select name="action" class="form-control" style="width: 150px;">
+            <option value="">All Actions</option>
+            <option value="login" <%= (typeof actionFilter !== 'undefined' && actionFilter == 'login') ? 'selected' : '' %>>Login</option>
+            <option value="settings" <%= (typeof actionFilter !== 'undefined' && actionFilter == 'settings') ? 'selected' : '' %>>Settings</option>
+            <option value="games" <%= (typeof actionFilter !== 'undefined' && actionFilter == 'games') ? 'selected' : '' %>>Games</option>
+            <option value="tokens" <%= (typeof actionFilter !== 'undefined' && actionFilter == 'tokens') ? 'selected' : '' %>>Tokens</option>
+        </select>
+        <select name="limit" class="form-control" style="width: 80px;">
+            <option value="25" <%= (typeof limit !== 'undefined' && limit == 25) ? 'selected' : '' %>>25</option>
+            <option value="50" <%= (typeof limit !== 'undefined' && limit == 50) ? 'selected' : '' %>>50</option>
+            <option value="100" <%= (typeof limit !== 'undefined' && limit == 100) ? 'selected' : '' %>>100</option>
+        </select>
+        <button type="submit" class="btn btn-primary">Search</button>
+        <% if ((typeof search !== 'undefined' && search) || (typeof actionFilter !== 'undefined' && actionFilter)) { %><a href="/dashboard/audit-logs" class="btn btn-secondary">Clear</a><% } %>
+    </form>
+</div>
+
+<!-- Logs Table -->
+<div class="card">
+    <% if (logs && logs.length > 0) { %>
+    <div class="table-container">
+        <table>
+            <thead><tr><th>ID</th><th>Time</th><th>User</th><th>Action</th><th>Category</th><th>Details</th></tr></thead>
+            <tbody>
+                <% logs.forEach(log => { %>
+                <tr>
+                    <td class="text-muted">#<%= log.id %></td>
+                    <td class="text-muted font-mono" style="font-size: 12px;"><%= new Date(log.created_at).toLocaleString() %></td>
+                    <td><strong><%= log.username || 'System' %></strong></td>
+                    <td><span class="badge badge-<%= log.action && log.action.includes('create') ? 'success' : log.action && log.action.includes('delete') ? 'danger' : log.action && log.action.includes('update') ? 'warning' : 'secondary' %>"><%= log.action || 'unknown' %></span></td>
+                    <td class="text-muted"><%= log.category || 'general' %></td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><small class="text-muted"><%= log.details ? (typeof log.details === 'object' ? JSON.stringify(log.details) : log.details) : '-' %></small></td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
+    <div style="display: flex; justify-content: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+        <% if (page > 1) { %><a href="?page=<%= page - 1 %>&limit=<%= limit %>&search=<%= search || '' %>&action=<%= actionFilter || '' %>" class="btn btn-secondary btn-sm">← Prev</a><% } %>
+        <span style="display: flex; align-items: center; padding: 0 16px; color: var(--text-muted);">Page <%= page %> of <%= totalPages %></span>
+        <% if (page < totalPages) { %><a href="?page=<%= page + 1 %>&limit=<%= limit %>&search=<%= search || '' %>&action=<%= actionFilter || '' %>" class="btn btn-secondary btn-sm">Next →</a><% } %>
+    </div>
+    <% } %>
+    <% } else { %>
+    <div class="empty-state"><div class="icon">📋</div><p>No logs found</p></div>
+    <% } %>
+</div>
+
+<%- include('partials/footer') %>

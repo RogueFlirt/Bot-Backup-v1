@@ -1,0 +1,167 @@
+<%- include('partials/header', { title: title }) %>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-heartbeat text-danger"></i> Game Health Dashboard</h1>
+        <button class="btn btn-outline-primary" onclick="location.reload()">
+            <i class="fas fa-sync"></i> Refresh
+        </button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h3><%= health.summary.critical_count || 0 %></h3>
+                    <p class="mb-0"><i class="fas fa-times-circle"></i> Critical</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h3><%= health.summary.warning_count || 0 %></h3>
+                    <p class="mb-0"><i class="fas fa-exclamation-triangle"></i> Warning</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3><%= health.summary.healthy_count || 0 %></h3>
+                    <p class="mb-0"><i class="fas fa-check-circle"></i> Healthy</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3><%= health.summary.total_games || 0 %></h3>
+                    <p class="mb-0"><i class="fas fa-gamepad"></i> Total Games</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Critical Games -->
+    <% if (health.critical && health.critical.length > 0) { %>
+    <div class="card mb-4 border-danger">
+        <div class="card-header bg-danger text-white">
+            <i class="fas fa-times-circle"></i> Critical - Immediate Attention Required (<%= health.critical.length %>)
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Game</th>
+                            <th>Platform</th>
+                            <th>Health</th>
+                            <th>Available</th>
+                            <th>Total</th>
+                            <th>Ghost Rate</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% health.critical.forEach(function(game) { %>
+                        <tr>
+                            <td><strong><%= game.name %></strong></td>
+                            <td><span class="badge bg-<%= game.platform === 'steam' ? 'info' : game.platform === 'ea' ? 'warning' : 'success' %>"><%= game.platform.toUpperCase() %></span></td>
+                            <td>
+                                <div class="progress" style="height: 20px; min-width: 60px;">
+                                    <div class="progress-bar bg-danger" style="width: <%= game.health_score %>%"><%= game.health_score %></div>
+                                </div>
+                            </td>
+                            <td><span class="badge bg-<%= game.available_tokens === 0 ? 'danger' : 'warning' %>"><%= game.available_tokens %></span></td>
+                            <td><%= game.total_tokens %></td>
+                            <td><%= game.completion_count_7d > 0 ? Math.round((game.ghost_count_7d / (game.completion_count_7d + game.ghost_count_7d)) * 100) : 0 %>%</td>
+                            <td>
+                                <a href="/dashboard/<%= game.platform %>/tokens?game=<%= game.id %>" class="btn btn-sm btn-danger">
+                                    <i class="fas fa-plus"></i> Add Tokens
+                                </a>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <% } %>
+
+    <!-- Warning Games -->
+    <% if (health.warning && health.warning.length > 0) { %>
+    <div class="card mb-4 border-warning">
+        <div class="card-header bg-warning text-dark">
+            <i class="fas fa-exclamation-triangle"></i> Warning - Low Resources (<%= health.warning.length %>)
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Game</th>
+                            <th>Platform</th>
+                            <th>Health</th>
+                            <th>Available</th>
+                            <th>Total</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% health.warning.forEach(function(game) { %>
+                        <tr>
+                            <td><%= game.name %></td>
+                            <td><span class="badge bg-<%= game.platform === 'steam' ? 'info' : game.platform === 'ea' ? 'warning' : 'success' %>"><%= game.platform.toUpperCase() %></span></td>
+                            <td>
+                                <div class="progress" style="height: 20px; min-width: 60px;">
+                                    <div class="progress-bar bg-warning" style="width: <%= game.health_score %>%"><%= game.health_score %></div>
+                                </div>
+                            </td>
+                            <td><span class="badge bg-warning"><%= game.available_tokens %></span></td>
+                            <td><%= game.total_tokens %></td>
+                            <td>
+                                <a href="/dashboard/game/<%= game.platform %>/<%= game.id %>/analytics" class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-chart-line"></i> Analytics
+                                </a>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <% } %>
+
+    <!-- Healthy Games -->
+    <div class="card border-success">
+        <div class="card-header bg-success text-white">
+            <i class="fas fa-check-circle"></i> Healthy Games (<%= health.healthy ? health.healthy.length : 0 %>)
+        </div>
+        <div class="card-body">
+            <% if (health.healthy && health.healthy.length > 0) { %>
+            <div class="row">
+                <% health.healthy.slice(0, 20).forEach(function(game) { %>
+                <div class="col-md-3 mb-2">
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-<%= game.platform === 'steam' ? 'info' : game.platform === 'ea' ? 'warning' : 'success' %> me-2"><%= game.platform.charAt(0).toUpperCase() %></span>
+                        <small><%= game.name %></small>
+                        <span class="badge bg-success ms-auto"><%= game.available_tokens %>/<%= game.total_tokens %></span>
+                    </div>
+                </div>
+                <% }); %>
+            </div>
+            <% if (health.healthy.length > 20) { %>
+            <p class="text-muted mt-2">...and <%= health.healthy.length - 20 %> more healthy games</p>
+            <% } %>
+            <% } else { %>
+            <p class="text-muted">No healthy games</p>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<%- include('partials/footer') %>

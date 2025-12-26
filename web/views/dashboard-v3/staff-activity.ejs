@@ -1,0 +1,92 @@
+<%- include('partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">👥</span>
+        Staff Activity
+    </h1>
+    <div class="filters">
+        <a href="?days=7" class="filter-btn <%= (days || 30) == 7 ? 'active' : '' %>">7 Days</a>
+        <a href="?days=30" class="filter-btn <%= (days || 30) == 30 ? 'active' : '' %>">30 Days</a>
+        <a href="?days=90" class="filter-btn <%= (days || 30) == 90 ? 'active' : '' %>">90 Days</a>
+    </div>
+</div>
+
+<!-- Search -->
+<div class="card" style="margin-bottom: 20px;">
+    <form method="GET" style="display: flex; gap: 12px; align-items: center;">
+        <input type="text" name="search" class="form-control" placeholder="🔍 Search staff member..." value="<%= typeof search !== 'undefined' ? search : '' %>" style="flex: 1;">
+        <input type="hidden" name="days" value="<%= days || 30 %>">
+        <button type="submit" class="btn btn-primary">Search</button>
+        <% if (typeof search !== 'undefined' && search) { %><a href="/dashboard/staff-activity?days=<%= days || 30 %>" class="btn btn-secondary">Clear</a><% } %>
+    </form>
+</div>
+
+<div class="card">
+    <% 
+    let filteredActivity = activity || [];
+    if (typeof search !== 'undefined' && search) {
+        const searchLower = search.toLowerCase();
+        filteredActivity = filteredActivity.filter(a => 
+            (a.staff_name && a.staff_name.toLowerCase().includes(searchLower)) ||
+            (a.username && a.username.toLowerCase().includes(searchLower)) ||
+            (a.staff_member && a.staff_member.toLowerCase().includes(searchLower))
+        );
+    }
+    %>
+    <% if (filteredActivity && filteredActivity.length > 0) { %>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Staff Member</th>
+                    <th>Total Actions</th>
+                    <th>Completions</th>
+                    <th>Verifications</th>
+                    <th>Closes</th>
+                    <th>Platforms</th>
+                    <th>Last Active</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% filteredActivity.forEach((a, i) => { %>
+                <tr>
+                    <td>
+                        <% if (i === 0) { %>🥇
+                        <% } else if (i === 1) { %>🥈
+                        <% } else if (i === 2) { %>🥉
+                        <% } else { %>#<%= i + 1 %><% } %>
+                    </td>
+                    <td><strong><%= a.staff_name || a.username || a.staff_member || '-' %></strong></td>
+                    <td><span class="badge badge-primary"><%= a.total_actions || 0 %></span></td>
+                    <td><span class="badge badge-success"><%= a.completions || 0 %></span></td>
+                    <td><%= a.verifications || 0 %></td>
+                    <td><%= a.closes || 0 %></td>
+                    <td>
+                        <% if (a.steam_actions > 0) { %><span class="badge badge-steam" style="font-size: 10px;">S:<%= a.steam_actions %></span><% } %>
+                        <% if (a.ubisoft_actions > 0) { %><span class="badge badge-ubisoft" style="font-size: 10px;">U:<%= a.ubisoft_actions %></span><% } %>
+                        <% if (a.ea_actions > 0) { %><span class="badge badge-ea" style="font-size: 10px;">E:<%= a.ea_actions %></span><% } %>
+                        <% if (!a.steam_actions && !a.ubisoft_actions && !a.ea_actions) { %>-<% } %>
+                    </td>
+                    <td class="text-muted font-mono">
+                        <% if (a.last_action) { %>
+                            <%= new Date(a.last_action).toLocaleString() %>
+                        <% } else { %>
+                            -
+                        <% } %>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    <% } else { %>
+    <div class="empty-state">
+        <div class="icon">👥</div>
+        <p>No staff activity found<%= (typeof search !== 'undefined' && search) ? ' for "' + search + '"' : '' %>.</p>
+    </div>
+    <% } %>
+</div>
+
+<%- include('partials/footer') %>

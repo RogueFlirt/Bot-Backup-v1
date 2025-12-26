@@ -1,0 +1,191 @@
+<%- include('partials/header', { title: title }) %>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-trophy text-warning"></i> Staff Leaderboard</h1>
+        <div class="btn-group">
+            <a href="?days=7" class="btn btn-<%= (days || 30) == 7 ? 'primary' : 'outline-primary' %>">7 Days</a>
+            <a href="?days=30" class="btn btn-<%= (days || 30) == 30 ? 'primary' : 'outline-primary' %>">30 Days</a>
+            <a href="?days=90" class="btn btn-<%= (days || 30) == 90 ? 'primary' : 'outline-primary' %>">90 Days</a>
+            <a href="?days=365" class="btn btn-<%= (days || 30) == 365 ? 'primary' : 'outline-primary' %>">All Time</a>
+        </div>
+    </div>
+
+    <!-- Search & Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3 align-items-end">
+                <input type="hidden" name="days" value="<%= days || 30 %>">
+                <div class="col-md-4">
+                    <label class="form-label">Search Staff</label>
+                    <input type="text" name="search" class="form-control" placeholder="Enter staff name..." value="<%= search || '' %>">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Sort By</label>
+                    <select name="sort" class="form-select">
+                        <option value="total" <%= (sort || 'total') == 'total' ? 'selected' : '' %>>Total Actions</option>
+                        <option value="completions" <%= sort == 'completions' ? 'selected' : '' %>>Completions</option>
+                        <option value="verifications" <%= sort == 'verifications' ? 'selected' : '' %>>Verifications</option>
+                        <option value="recent" <%= sort == 'recent' ? 'selected' : '' %>>Most Recent</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Platform Filter</label>
+                    <select name="platform" class="form-select">
+                        <option value="">All Platforms</option>
+                        <option value="steam" <%= platform == 'steam' ? 'selected' : '' %>>Steam Only</option>
+                        <option value="ubisoft" <%= platform == 'ubisoft' ? 'selected' : '' %>>Ubisoft Only</option>
+                        <option value="ea" <%= platform == 'ea' ? 'selected' : '' %>>EA Only</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="fas fa-search"></i> Filter</button>
+                </div>
+            </form>
+            <% if (search || platform) { %>
+            <a href="/dashboard/staff-leaderboard?days=<%= days || 30 %>" class="btn btn-outline-secondary mt-2">Clear Filters</a>
+            <% } %>
+        </div>
+    </div>
+
+    <% if (leaderboard && leaderboard.length > 0) { %>
+    
+    <!-- Top 3 Podium -->
+    <div class="row mb-4">
+        <% leaderboard.slice(0, 3).forEach((staff, index) => { %>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100 <%= index === 0 ? 'border-warning' : index === 1 ? 'border-secondary' : 'border-dark' %>" 
+                 style="<%= index === 0 ? 'box-shadow: 0 0 20px rgba(255, 193, 7, 0.3);' : '' %>">
+                <div class="card-header text-center py-3" style="background: <%= index === 0 ? 'linear-gradient(135deg, #f5af19, #f12711)' : index === 1 ? 'linear-gradient(135deg, #bdc3c7, #2c3e50)' : 'linear-gradient(135deg, #8B4513, #D2691E)' %>;">
+                    <span style="font-size: 2.5rem;"><%= index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉' %></span>
+                    <h3 class="mb-0 text-white"><%= staff.staff_name || staff.staff_member %></h3>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h2 class="text-primary mb-0"><%= staff.total_actions %></h2>
+                        <small class="text-muted">Total Actions</small>
+                    </div>
+                    <hr>
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <h5 class="text-success mb-0"><%= staff.completions || 0 %></h5>
+                            <small class="text-muted">Done</small>
+                        </div>
+                        <div class="col-4">
+                            <h5 class="text-info mb-0"><%= staff.verifications || 0 %></h5>
+                            <small class="text-muted">Verified</small>
+                        </div>
+                        <div class="col-4">
+                            <h5 class="text-warning mb-0"><%= staff.closes || 0 %></h5>
+                            <small class="text-muted">Closed</small>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <span class="badge bg-success"><%= staff.steam_actions || 0 %></span>
+                            <br><small>Steam</small>
+                        </div>
+                        <div class="col-4">
+                            <span class="badge bg-info"><%= staff.ubisoft_actions || 0 %></span>
+                            <br><small>Ubisoft</small>
+                        </div>
+                        <div class="col-4">
+                            <span class="badge bg-danger"><%= staff.ea_actions || 0 %></span>
+                            <br><small>EA</small>
+                        </div>
+                    </div>
+                    <% if (staff.avg_duration) { %>
+                    <hr>
+                    <div class="text-center">
+                        <small class="text-muted"><i class="fas fa-clock"></i> Avg: <%= staff.avg_duration %> min/ticket</small>
+                    </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+        <% }); %>
+    </div>
+
+    <!-- Full Rankings Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="fas fa-list-ol"></i> Complete Rankings</span>
+            <span class="badge bg-primary"><%= leaderboard.length %> Staff Members</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Rank</th>
+                            <th>Staff Member</th>
+                            <th>Total</th>
+                            <th>Completions</th>
+                            <th>Verifications</th>
+                            <th>Closes</th>
+                            <th>Platforms</th>
+                            <th>Avg Time</th>
+                            <th>Last Active</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% leaderboard.forEach((staff, index) => { %>
+                        <tr>
+                            <td>
+                                <% if (index === 0) { %>
+                                    <span class="badge bg-warning text-dark fs-6">🥇 1</span>
+                                <% } else if (index === 1) { %>
+                                    <span class="badge bg-secondary fs-6">🥈 2</span>
+                                <% } else if (index === 2) { %>
+                                    <span class="badge text-white fs-6" style="background: #CD7F32;">🥉 3</span>
+                                <% } else { %>
+                                    <span class="badge bg-dark fs-6">#<%= index + 1 %></span>
+                                <% } %>
+                            </td>
+                            <td><strong><%= staff.staff_name || staff.staff_member %></strong></td>
+                            <td><span class="badge bg-primary fs-6"><%= staff.total_actions %></span></td>
+                            <td><span class="badge bg-success"><%= staff.completions || 0 %></span></td>
+                            <td><span class="badge bg-info"><%= staff.verifications || 0 %></span></td>
+                            <td><span class="badge bg-warning text-dark"><%= staff.closes || 0 %></span></td>
+                            <td>
+                                <% if (staff.steam_actions > 0) { %><span class="badge bg-success me-1"><%= staff.steam_actions %> S</span><% } %>
+                                <% if (staff.ubisoft_actions > 0) { %><span class="badge bg-info me-1"><%= staff.ubisoft_actions %> U</span><% } %>
+                                <% if (staff.ea_actions > 0) { %><span class="badge bg-danger"><%= staff.ea_actions %> E</span><% } %>
+                            </td>
+                            <td>
+                                <% if (staff.avg_duration) { %>
+                                <%= staff.avg_duration %> min
+                                <% } else { %>
+                                <span class="text-muted">N/A</span>
+                                <% } %>
+                            </td>
+                            <td>
+                                <small><%= staff.last_action ? new Date(staff.last_action).toLocaleString() : 'N/A' %></small>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <% } else { %>
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="fas fa-users fa-4x text-muted mb-3"></i>
+            <h3>No staff activity found</h3>
+            <p class="text-muted">
+                <% if (search || platform) { %>
+                No results match your filters. Try adjusting your search criteria.
+                <% } else { %>
+                Staff actions will appear here once tickets are processed.
+                <% } %>
+            </p>
+        </div>
+    </div>
+    <% } %>
+</div>
+
+<%- include('partials/footer') %>

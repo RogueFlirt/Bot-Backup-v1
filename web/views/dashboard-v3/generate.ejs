@@ -1,0 +1,415 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">⚡</span>
+        Generate Steam Tokens
+    </h1>
+</div>
+
+<!-- Queue Status Panel -->
+<div class="card" style="margin-bottom: 20px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);">
+    <div class="card-header">
+        <span class="card-title">🔄 Generator Status</span>
+        <span id="queueRefresh" style="font-size: 12px; color: var(--text-muted);">Auto-refresh</span>
+    </div>
+    <div style="padding: 15px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+            <div style="text-align: center;">
+                <div style="font-size: 24px; font-weight: bold; color: #5865F2;" id="queueLength">-</div>
+                <div style="font-size: 12px; color: var(--text-muted);">In Queue</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 24px; font-weight: bold; color: #23a559;" id="workersActive">-</div>
+                <div style="font-size: 12px; color: var(--text-muted);">Workers Active</div>
+            </div>
+            <div style="text-align: center;">
+                <div style="font-size: 24px; font-weight: bold; color: #f0b232;" id="etaMinutes">-</div>
+                <div style="font-size: 12px; color: var(--text-muted);">Est. Wait (min)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Generation Form -->
+<div class="card" id="generationForm">
+    <div class="card-header">
+        <span class="card-title">🎮 New Token Generation</span>
+    </div>
+    
+    <div style="padding: 20px;">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Game</label>
+                <select name="game_id" id="gameSelect" class="form-control" required>
+                    <option value="">Select Game...</option>
+                    <% games.forEach(g => { %>
+                    <option value="<%= g.id %>" data-folder="<%= g.folder_name || g.game_name %>"><%= g.game_name %></option>
+                    <% }); %>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Account</label>
+                <select name="account_id" id="accountSelect" class="form-control" required>
+                    <option value="">Select Account...</option>
+                    <% accounts.forEach(a => { %>
+                    <option value="<%= a.id %>" data-name="<%= a.account_name %>">
+                        <%= a.account_number ? `#${a.account_number} - ` : '' %><%= a.account_name %>
+                    </option>
+                    <% }); %>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Steam ID <span style="color: var(--text-muted);">(Optional - for refills)</span></label>
+            <input type="text" name="steam_id" id="steamId" class="form-control" placeholder="Enter Steam ID for refill...">
+        </div>
+        
+        <button type="button" class="btn btn-primary" id="generateBtn" onclick="startGeneration()">
+            ⚡ Generate Token
+        </button>
+    </div>
+</div>
+
+<!-- Generation Progress -->
+<div class="card" id="progressCard" style="display: none;">
+    <div class="card-header">
+        <span class="card-title">⏳ Generation in Progress</span>
+    </div>
+    
+    <div style="padding: 20px;">
+        <div id="progressInfo" style="margin-bottom: 15px;">
+            <div style="font-size: 16px; margin-bottom: 10px;">
+                <strong id="progressGame">-</strong> on <strong id="progressAccount">-</strong>
+            </div>
+            <div style="color: var(--text-muted); font-size: 14px;" id="progressStatus">Queued...</div>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div style="background: #2a2a3e; border-radius: 10px; height: 20px; overflow: hidden; margin-bottom: 15px;">
+            <div id="progressBar" style="background: linear-gradient(90deg, #5865F2, #7289da); height: 100%; width: 0%; transition: width 0.5s ease; display: flex; align-items: center; justify-content: center;">
+                <span id="progressPercent" style="font-size: 11px; font-weight: bold; color: white;"></span>
+            </div>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted);">
+            <span>Position: <span id="queuePosition">#-</span></span>
+            <span>ETA: <span id="progressEta">-</span></span>
+            <span>Elapsed: <span id="progressElapsed">0s</span></span>
+        </div>
+        
+        <button type="button" class="btn" style="margin-top: 15px; background: #4a4a5e;" onclick="cancelGeneration()">
+            Cancel
+        </button>
+    </div>
+</div>
+
+<!-- Generation Result -->
+<div class="card" id="resultCard" style="display: none;">
+    <div class="card-header">
+        <span class="card-title" id="resultTitle">✅ Generation Complete</span>
+    </div>
+    
+    <div style="padding: 20px;">
+        <div id="resultSuccess" style="display: none;">
+            <div style="background: #23a55920; border: 1px solid #23a559; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <div style="font-size: 18px; font-weight: bold; color: #23a559; margin-bottom: 10px;">
+                    Token Generated Successfully!
+                </div>
+                <div style="color: var(--text-muted);">
+                    <div>Game: <strong id="resultGame">-</strong></div>
+                    <div>Account: <strong id="resultAccount">-</strong></div>
+                    <div>File Size: <strong id="resultSize">-</strong></div>
+                    <div>Generation Time: <strong id="resultTime">-</strong></div>
+                </div>
+            </div>
+            
+            <a id="downloadLink" href="#" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 8px;">
+                📥 Download Token File
+            </a>
+            
+            <button type="button" class="btn" style="background: #4a4a5e; margin-left: 10px;" onclick="resetForm()">
+                Generate Another
+            </button>
+        </div>
+        
+        <div id="resultError" style="display: none;">
+            <div style="background: #ed424220; border: 1px solid #ed4245; border-radius: 8px; padding: 15px;">
+                <div style="font-size: 18px; font-weight: bold; color: #ed4245; margin-bottom: 10px;">
+                    ❌ Generation Failed
+                </div>
+                <div style="color: var(--text-muted);" id="errorMessage">-</div>
+            </div>
+            
+            <button type="button" class="btn btn-primary" style="margin-top: 15px;" onclick="resetForm()">
+                Try Again
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Downloads -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <span class="card-title">📁 Recent Generated Files</span>
+        <button type="button" class="btn btn-sm" onclick="refreshFiles()" style="padding: 4px 10px;">🔄 Refresh</button>
+    </div>
+    
+    <div id="recentFiles" style="padding: 15px;">
+        <div style="color: var(--text-muted); text-align: center;">Loading...</div>
+    </div>
+</div>
+
+<style>
+.file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 15px;
+    background: #2a2a3e;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+.file-item:last-child { margin-bottom: 0; }
+.file-info { flex: 1; }
+.file-name { font-weight: 500; margin-bottom: 4px; }
+.file-meta { font-size: 12px; color: var(--text-muted); }
+.file-actions { display: flex; gap: 8px; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.progress-pulse {
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+</style>
+
+<script>
+const games = <%- JSON.stringify(games || []) %>;
+const accounts = <%- JSON.stringify(accounts || []) %>;
+
+let currentJobId = null;
+let pollInterval = null;
+let elapsedInterval = null;
+let startTime = null;
+
+// Update queue status on load and periodically
+function updateQueueStatus() {
+    fetch('/dashboard/api/steam/generator-status')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('queueLength').textContent = data.queueLength || 0;
+            document.getElementById('workersActive').textContent = data.workersActive || 0;
+            document.getElementById('etaMinutes').textContent = data.etaMinutes || 0;
+        })
+        .catch(() => {});
+}
+
+// Start generation
+function startGeneration() {
+    const gameSelect = document.getElementById('gameSelect');
+    const accountSelect = document.getElementById('accountSelect');
+    const steamId = document.getElementById('steamId').value.trim();
+    
+    if (!gameSelect.value || !accountSelect.value) {
+        alert('Please select a game and account');
+        return;
+    }
+    
+    const gameName = gameSelect.options[gameSelect.selectedIndex].dataset.folder || 
+                     gameSelect.options[gameSelect.selectedIndex].text;
+    const accountName = accountSelect.options[accountSelect.selectedIndex].dataset.name;
+    
+    // Show progress, hide form
+    document.getElementById('generationForm').style.display = 'none';
+    document.getElementById('progressCard').style.display = 'block';
+    document.getElementById('resultCard').style.display = 'none';
+    
+    document.getElementById('progressGame').textContent = gameSelect.options[gameSelect.selectedIndex].text;
+    document.getElementById('progressAccount').textContent = accountSelect.options[accountSelect.selectedIndex].text;
+    document.getElementById('progressStatus').textContent = 'Submitting request...';
+    document.getElementById('progressBar').style.width = '5%';
+    
+    startTime = Date.now();
+    startElapsedTimer();
+    
+    // Submit generation request
+    fetch('/dashboard/api/steam/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            game_name: gameName,
+            account_name: accountName,
+            steam_id: steamId
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            currentJobId = data.jobId;
+            document.getElementById('progressStatus').textContent = 'Queued - waiting for worker...';
+            document.getElementById('progressBar').style.width = '10%';
+            startPolling();
+        } else {
+            showError(data.error || 'Failed to start generation');
+        }
+    })
+    .catch(err => {
+        showError('Request failed: ' + err.message);
+    });
+}
+
+// Poll for job status
+function startPolling() {
+    if (pollInterval) clearInterval(pollInterval);
+    
+    pollInterval = setInterval(() => {
+        if (!currentJobId) return;
+        
+        fetch('/dashboard/api/steam/job-status/' + currentJobId)
+            .then(r => r.json())
+            .then(data => {
+                updateProgress(data);
+            })
+            .catch(() => {});
+    }, 2000);
+}
+
+function updateProgress(data) {
+    if (data.status === 'queued') {
+        document.getElementById('progressStatus').textContent = 'In queue...';
+        document.getElementById('queuePosition').textContent = '#' + (data.position || '?');
+        document.getElementById('progressEta').textContent = (data.eta || '?') + ' min';
+        document.getElementById('progressBar').style.width = '15%';
+    }
+    else if (data.status === 'processing') {
+        document.getElementById('progressStatus').innerHTML = '<span class="progress-pulse">Generating token...</span>';
+        document.getElementById('queuePosition').textContent = 'Active';
+        document.getElementById('progressEta').textContent = '~1 min';
+        document.getElementById('progressBar').style.width = '50%';
+    }
+    else if (data.status === 'complete') {
+        clearInterval(pollInterval);
+        clearInterval(elapsedInterval);
+        document.getElementById('progressBar').style.width = '100%';
+        setTimeout(() => showSuccess(data.result), 500);
+    }
+    else if (data.status === 'failed') {
+        clearInterval(pollInterval);
+        clearInterval(elapsedInterval);
+        showError(data.error || 'Generation failed');
+    }
+}
+
+function showSuccess(result) {
+    document.getElementById('progressCard').style.display = 'none';
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('resultSuccess').style.display = 'block';
+    document.getElementById('resultError').style.display = 'none';
+    document.getElementById('resultTitle').textContent = '✅ Generation Complete';
+    
+    document.getElementById('resultGame').textContent = result.game || '-';
+    document.getElementById('resultAccount').textContent = result.account || '-';
+    document.getElementById('resultSize').textContent = formatBytes(result.zipSize) || '-';
+    document.getElementById('resultTime').textContent = (result.generationTime || '-') + 's';
+    
+    document.getElementById('downloadLink').href = '/dashboard/api/steam/download/' + encodeURIComponent(result.zipName);
+    
+    refreshFiles();
+}
+
+function showError(message) {
+    document.getElementById('progressCard').style.display = 'none';
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('resultSuccess').style.display = 'none';
+    document.getElementById('resultError').style.display = 'block';
+    document.getElementById('resultTitle').textContent = '❌ Generation Failed';
+    document.getElementById('errorMessage').textContent = message;
+    
+    clearInterval(pollInterval);
+    clearInterval(elapsedInterval);
+}
+
+function resetForm() {
+    currentJobId = null;
+    document.getElementById('generationForm').style.display = 'block';
+    document.getElementById('progressCard').style.display = 'none';
+    document.getElementById('resultCard').style.display = 'none';
+    document.getElementById('progressBar').style.width = '0%';
+}
+
+function cancelGeneration() {
+    if (currentJobId) {
+        fetch('/dashboard/api/steam/cancel-job/' + currentJobId, { method: 'POST' })
+            .catch(() => {});
+    }
+    clearInterval(pollInterval);
+    clearInterval(elapsedInterval);
+    resetForm();
+}
+
+function startElapsedTimer() {
+    if (elapsedInterval) clearInterval(elapsedInterval);
+    elapsedInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        document.getElementById('progressElapsed').textContent = elapsed + 's';
+    }, 1000);
+}
+
+function refreshFiles() {
+    fetch('/dashboard/api/steam/generated-files')
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('recentFiles');
+            if (!data.files || data.files.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-muted); text-align: center;">No recent files</div>';
+                return;
+            }
+            
+            container.innerHTML = data.files.map(f => `
+                <div class="file-item">
+                    <div class="file-info">
+                        <div class="file-name">📦 ${f.fileName}</div>
+                        <div class="file-meta">${formatBytes(f.size)} • ${new Date(f.createdAt).toLocaleString()} • Auto-delete in ${f.autoDeleteMin || '?'} min</div>
+                    </div>
+                    <div class="file-actions">
+                        <a href="/dashboard/api/steam/download/${encodeURIComponent(f.fileName)}" class="btn btn-sm btn-primary">📥 Download</a>
+                        <button class="btn btn-sm" style="background: #ed4245;" onclick="deleteFile('${f.fileName}')">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        })
+        .catch(() => {
+            document.getElementById('recentFiles').innerHTML = '<div style="color: var(--text-muted);">Failed to load files</div>';
+        });
+}
+
+function deleteFile(fileName) {
+    if (!confirm('Delete this file?')) return;
+    
+    fetch('/dashboard/api/steam/delete-file/' + encodeURIComponent(fileName), { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) refreshFiles();
+            else alert('Failed to delete: ' + (data.error || 'Unknown error'));
+        })
+        .catch(() => alert('Delete request failed'));
+}
+
+function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Initial load
+updateQueueStatus();
+refreshFiles();
+setInterval(updateQueueStatus, 5000);
+</script>
+
+<%- include('../partials/footer') %>

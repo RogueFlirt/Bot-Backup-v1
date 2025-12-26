@@ -1,0 +1,53 @@
+<%- include('partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">👤</span>
+        Dashboard Users
+    </h1>
+    <div class="page-actions">
+        <a href="/dashboard/users/add" class="btn btn-primary">➕ Add User</a>
+    </div>
+</div>
+
+<div class="card">
+    <% if (users && users.length > 0) { %>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Last Login</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% users.forEach(u => { %>
+                <tr>
+                    <td><strong><%= u.username %></strong></td>
+                    <td>
+                        <span class="badge badge-<%= u.role === 'admin' ? 'danger' : u.role === 'staff' ? 'warning' : 'info' %>">
+                            <%= u.role %>
+                        </span>
+                    </td>
+                    <td class="text-muted font-mono"><%= u.last_login ? formatDate(u.last_login) : 'Never' %></td>
+                    <td>
+                        <form method="POST" action="/dashboard/users/<%= u.id %>/delete" data-confirm="Delete this user?" style="display:inline;">
+                            <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+                        </form>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    <% } else { %>
+    <div class="empty-state">
+        <div class="icon">👤</div>
+        <p>No users configured.</p>
+    </div>
+    <% } %>
+</div>
+
+<%- include('partials/footer') %>

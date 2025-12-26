@@ -1,0 +1,179 @@
+<%- include('partials/header', { title: title }) %>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-user-tie"></i> <%= profile.stats.staff_name || 'Staff Profile' %></h1>
+        <a href="/dashboard/staff-leaderboard" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Leaderboard
+        </a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3><%= profile.stats.total_actions || 0 %></h3>
+                    <p class="mb-0">Total Actions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3><%= profile.stats.completions || 0 %></h3>
+                    <p class="mb-0">Completions</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h3><%= profile.stats.rejections || 0 %></h3>
+                    <p class="mb-0">Rejections</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3><%= profile.stats.avg_duration ? Math.round(profile.stats.avg_duration) + ' min' : 'N/A' %></h3>
+                    <p class="mb-0">Avg Duration</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Hourly Distribution -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header"><i class="fas fa-clock"></i> Activity by Hour</div>
+                <div class="card-body">
+                    <canvas id="hourlyChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Games -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header"><i class="fas fa-gamepad"></i> Top Games Handled</div>
+                <div class="card-body">
+                    <% if (profile.topGames && profile.topGames.length > 0) { %>
+                    <table class="table table-sm">
+                        <tbody>
+                            <% profile.topGames.forEach(function(game) { %>
+                            <tr>
+                                <td><%= game.game_name %></td>
+                                <td class="text-end"><span class="badge bg-primary"><%= game.count %></span></td>
+                            </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                    <% } else { %>
+                    <p class="text-muted">No game data available</p>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily Activity Chart -->
+    <div class="card mb-4">
+        <div class="card-header"><i class="fas fa-chart-line"></i> Daily Activity</div>
+        <div class="card-body">
+            <canvas id="dailyChart" height="100"></canvas>
+        </div>
+    </div>
+
+    <!-- Recent Actions -->
+    <div class="card">
+        <div class="card-header"><i class="fas fa-history"></i> Recent Actions</div>
+        <div class="card-body">
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm">
+                    <thead class="table-dark sticky-top">
+                        <tr>
+                            <th>Time</th>
+                            <th>Event</th>
+                            <th>User</th>
+                            <th>Game</th>
+                            <th>Platform</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (profile.recentActions && profile.recentActions.length > 0) { %>
+                            <% profile.recentActions.forEach(function(action) { %>
+                            <tr>
+                                <td><small><%= new Date(action.created_at).toLocaleString() %></small></td>
+                                <td>
+                                    <span class="badge bg-<%= action.event_type === 'completed' ? 'success' : action.event_type.includes('ghost') ? 'warning' : 'secondary' %>">
+                                        <%= action.event_type %>
+                                    </span>
+                                </td>
+                                <td><%= action.username || 'N/A' %></td>
+                                <td><%= action.game_name || 'N/A' %></td>
+                                <td><span class="badge bg-info"><%= action.platform %></span></td>
+                            </tr>
+                            <% }); %>
+                        <% } else { %>
+                            <tr><td colspan="5" class="text-center text-muted">No recent actions</td></tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Hourly Chart
+const hourlyData = <%- JSON.stringify(profile.hourlyDistribution || []) %>;
+const hourlyLabels = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0') + ':00');
+const hourlyCounts = hourlyLabels.map((_, i) => {
+    const found = hourlyData.find(h => parseInt(h.hour) === i);
+    return found ? found.count : 0;
+});
+
+new Chart(document.getElementById('hourlyChart'), {
+    type: 'bar',
+    data: {
+        labels: hourlyLabels,
+        datasets: [{
+            label: 'Actions',
+            data: hourlyCounts,
+            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: { scales: { y: { beginAtZero: true } } }
+});
+
+// Daily Chart
+const dailyData = <%- JSON.stringify(profile.dailyActivity || []) %>;
+new Chart(document.getElementById('dailyChart'), {
+    type: 'line',
+    data: {
+        labels: dailyData.map(d => d.date),
+        datasets: [{
+            label: 'Actions',
+            data: dailyData.map(d => d.actions),
+            borderColor: 'rgba(75, 192, 192, 1)',
+            tension: 0.1,
+            fill: false
+        }, {
+            label: 'Completions',
+            data: dailyData.map(d => d.completions),
+            borderColor: 'rgba(40, 167, 69, 1)',
+            tension: 0.1,
+            fill: false
+        }]
+    },
+    options: { scales: { y: { beginAtZero: true } } }
+});
+</script>
+
+<%- include('partials/footer') %>

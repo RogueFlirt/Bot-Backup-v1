@@ -1,0 +1,88 @@
+<%- include('partials/header', { title: title }) %>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-exclamation-triangle text-danger"></i> Problem Users</h1>
+        <div class="d-flex gap-2">
+            <select id="daysFilter" class="form-select" style="width: auto;" onchange="updateFilters()">
+                <option value="7" <%= days == 7 ? 'selected' : '' %>>Last 7 Days</option>
+                <option value="30" <%= days == 30 ? 'selected' : '' %>>Last 30 Days</option>
+                <option value="90" <%= days == 90 ? 'selected' : '' %>>Last 90 Days</option>
+            </select>
+            <select id="limitFilter" class="form-select" style="width: auto;" onchange="updateFilters()">
+                <option value="20" <%= limit == 20 ? 'selected' : '' %>>Top 20</option>
+                <option value="50" <%= limit == 50 ? 'selected' : '' %>>Top 50</option>
+                <option value="100" <%= limit == 100 ? 'selected' : '' %>>Top 100</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="alert alert-warning">
+        <i class="fas fa-info-circle"></i> Problem users are identified by high ghost rates, frequent timeouts, or cooldown violations. 
+        Users with more than 20% ghost rate are flagged.
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <% if (users && users.length > 0) { %>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Username</th>
+                            <th>User ID</th>
+                            <th>Ghost Rate</th>
+                            <th>Ghosts</th>
+                            <th>Completions</th>
+                            <th>Timeouts</th>
+                            <th>Last Active</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% users.forEach(function(user, index) { %>
+                        <tr class="<%= user.ghost_rate >= 50 ? 'table-danger' : user.ghost_rate >= 30 ? 'table-warning' : '' %>">
+                            <td><%= index + 1 %></td>
+                            <td><strong><%= user.username %></strong></td>
+                            <td><code><%= user.user_id %></code></td>
+                            <td>
+                                <div class="progress" style="height: 20px; min-width: 80px;">
+                                    <div class="progress-bar bg-<%= user.ghost_rate >= 50 ? 'danger' : user.ghost_rate >= 30 ? 'warning' : 'info' %>" 
+                                         style="width: <%= user.ghost_rate %>%">
+                                        <%= user.ghost_rate %>%
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="badge bg-warning"><%= user.ghost_count %></span></td>
+                            <td><span class="badge bg-success"><%= user.completion_count %></span></td>
+                            <td><span class="badge bg-secondary"><%= user.timeout_count || 0 %></span></td>
+                            <td><small><%= user.last_active ? new Date(user.last_active).toLocaleString() : 'N/A' %></small></td>
+                            <td>
+                                <a href="/dashboard/user/<%= user.user_id %>" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+            <% } else { %>
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle"></i> No problem users found! Everyone is behaving well.
+            </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateFilters() {
+    const days = document.getElementById('daysFilter').value;
+    const limit = document.getElementById('limitFilter').value;
+    window.location.href = '?days=' + days + '&limit=' + limit;
+}
+</script>
+
+<%- include('partials/footer') %>

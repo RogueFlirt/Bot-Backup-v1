@@ -1,0 +1,69 @@
+<%- include('partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">🎫</span>
+        Live Tickets
+    </h1>
+</div>
+
+<div class="filters">
+    <a href="/dashboard/tickets?platform=all" class="filter-btn <%= currentPlatform === 'all' ? 'active' : '' %>">
+        All (<%= counts.all %>)
+    </a>
+    <a href="/dashboard/tickets?platform=steam" class="filter-btn <%= currentPlatform === 'steam' ? 'active' : '' %>">
+        🎮 Steam (<%= counts.steam %>)
+    </a>
+    <a href="/dashboard/tickets?platform=ubisoft" class="filter-btn <%= currentPlatform === 'ubisoft' ? 'active' : '' %>">
+        🎯 Ubisoft (<%= counts.ubisoft %>)
+    </a>
+    <a href="/dashboard/tickets?platform=ea" class="filter-btn <%= currentPlatform === 'ea' ? 'active' : '' %>">
+        🔴 EA (<%= counts.ea %>)
+    </a>
+</div>
+
+<div class="card">
+    <% if (tickets && tickets.length > 0) { %>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ticket ID</th>
+                    <th>Platform</th>
+                    <th>User</th>
+                    <th>Game</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% tickets.forEach(ticket => { %>
+                <tr>
+                    <td class="font-mono"><%= ticket.ticket_id %></td>
+                    <td>
+                        <span class="badge badge-<%= ticket.platform || 'steam' %>">
+                            <%= (ticket.platform || 'steam').toUpperCase() %>
+                        </span>
+                    </td>
+                    <td><%= ticket.username || ticket.user_id || '-' %></td>
+                    <td><%= ticket.game_name || '-' %></td>
+                    <td>
+                        <span class="badge badge-<%= ticket.status || 'open' %>">
+                            <%= ticket.status || 'open' %>
+                        </span>
+                    </td>
+                    <td class="text-muted font-mono"><%= formatDate(ticket.created_at) %></td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    <% } else { %>
+    <div class="empty-state">
+        <div class="icon">🎉</div>
+        <p>No open tickets!</p>
+    </div>
+    <% } %>
+</div>
+
+<%- include('partials/footer') %>

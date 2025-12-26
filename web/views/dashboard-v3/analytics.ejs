@@ -1,0 +1,136 @@
+<%- include('partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title"><span class="icon">📊</span> Analytics</h1>
+    <div class="filters">
+        <a href="?days=7" class="filter-btn <%= (days || 30) == 7 ? 'active' : '' %>">7 Days</a>
+        <a href="?days=30" class="filter-btn <%= (days || 30) == 30 ? 'active' : '' %>">30 Days</a>
+        <a href="?days=90" class="filter-btn <%= (days || 30) == 90 ? 'active' : '' %>">90 Days</a>
+        <a href="?days=365" class="filter-btn <%= (days || 30) == 365 ? 'active' : '' %>">All Time</a>
+    </div>
+</div>
+
+<!-- Platform Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon">🏆</div>
+        <div class="stat-value"><%= (platformTotals.steam || 0) + (platformTotals.ubisoft || 0) + (platformTotals.ea || 0) %></div>
+        <div class="stat-label">Total Activations</div>
+    </div>
+    <div class="stat-card steam">
+        <div class="stat-icon">🎮</div>
+        <div class="stat-value"><%= platformTotals.steam || 0 %></div>
+        <div class="stat-label">Steam</div>
+    </div>
+    <div class="stat-card ubisoft">
+        <div class="stat-icon">🎯</div>
+        <div class="stat-value"><%= platformTotals.ubisoft || 0 %></div>
+        <div class="stat-label">Ubisoft</div>
+    </div>
+    <div class="stat-card ea">
+        <div class="stat-icon">🔴</div>
+        <div class="stat-value"><%= platformTotals.ea || 0 %></div>
+        <div class="stat-label">EA</div>
+    </div>
+</div>
+
+<!-- Top Games & Users - Compact Grid -->
+<div class="two-col">
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">🔥 Top Games</span>
+            <span class="text-muted"><%= topGames ? topGames.length : 0 %> tracked</span>
+        </div>
+        <% if (topGames && topGames.length > 0) { %>
+        <div style="display: grid; gap: 4px;">
+            <% topGames.slice(0, 8).forEach((game, i) => { %>
+            <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: <%= i < 3 ? 'rgba(99, 102, 241, 0.1)' : 'transparent' %>; border-radius: 6px;">
+                <span><span style="color: <%= i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'var(--text-muted)' %>; font-weight: bold; margin-right: 8px;">#<%= i + 1 %></span><%= game.game_name || 'Unknown' %></span>
+                <span class="badge badge-primary"><%= game.count || game.activation_count || 0 %></span>
+            </div>
+            <% }); %>
+        </div>
+        <% } else { %>
+        <p class="text-muted text-center">No data</p>
+        <% } %>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">👑 Top Users</span>
+            <span class="text-muted"><%= topUsers ? topUsers.length : 0 %> active</span>
+        </div>
+        <% if (topUsers && topUsers.length > 0) { %>
+        <div style="display: grid; gap: 4px;">
+            <% topUsers.slice(0, 8).forEach((user, i) => { %>
+            <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: <%= i < 3 ? 'rgba(34, 197, 94, 0.1)' : 'transparent' %>; border-radius: 6px;">
+                <span><span style="color: <%= i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'var(--text-muted)' %>; font-weight: bold; margin-right: 8px;">#<%= i + 1 %></span><%= user.username || 'Unknown' %></span>
+                <span class="badge badge-success"><%= user.count || user.activation_count || 0 %></span>
+            </div>
+            <% }); %>
+        </div>
+        <% } else { %>
+        <p class="text-muted text-center">No data</p>
+        <% } %>
+    </div>
+</div>
+
+<!-- Platform Breakdown - Collapsible -->
+<div class="card">
+    <div class="card-header" style="cursor: pointer;" onclick="toggleSection('platformBreakdown')">
+        <span class="card-title">📈 Platform Breakdown</span>
+        <span style="color: var(--text-muted);">▼</span>
+    </div>
+    <div id="platformBreakdown" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+        <!-- Steam -->
+        <div style="padding: 12px; background: var(--bg-secondary); border-radius: 8px; border-left: 3px solid var(--steam-accent);">
+            <div style="font-weight: 600; margin-bottom: 8px;">🎮 Steam Top 5</div>
+            <% if (topSteamGames && topSteamGames.length > 0) { %>
+            <% topSteamGames.slice(0, 5).forEach((g, i) => { %>
+            <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0;"><span><%= i+1 %>. <%= g.game_name %></span><span><%= g.count || g.activation_count %></span></div>
+            <% }); %>
+            <% } else { %><span class="text-muted">No data</span><% } %>
+        </div>
+        <!-- Ubisoft -->
+        <div style="padding: 12px; background: var(--bg-secondary); border-radius: 8px; border-left: 3px solid var(--ubisoft-color);">
+            <div style="font-weight: 600; margin-bottom: 8px;">🎯 Ubisoft Top 5</div>
+            <% if (topUbisoftGames && topUbisoftGames.length > 0) { %>
+            <% topUbisoftGames.slice(0, 5).forEach((g, i) => { %>
+            <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0;"><span><%= i+1 %>. <%= g.game_name %></span><span><%= g.count || g.activation_count %></span></div>
+            <% }); %>
+            <% } else { %><span class="text-muted">No data</span><% } %>
+        </div>
+        <!-- EA -->
+        <div style="padding: 12px; background: var(--bg-secondary); border-radius: 8px; border-left: 3px solid var(--ea-color);">
+            <div style="font-weight: 600; margin-bottom: 8px;">🔴 EA Top 5</div>
+            <% if (topEAGames && topEAGames.length > 0) { %>
+            <% topEAGames.slice(0, 5).forEach((g, i) => { %>
+            <div style="display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0;"><span><%= i+1 %>. <%= g.game_name %></span><span><%= g.count || g.activation_count %></span></div>
+            <% }); %>
+            <% } else { %><span class="text-muted">No data</span><% } %>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Links -->
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">🔗 Quick Links</span>
+    </div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <a href="/dashboard/steam/activations" class="btn btn-secondary">Steam Activations</a>
+        <a href="/dashboard/ubisoft/activations" class="btn btn-secondary">Ubisoft Activations</a>
+        <a href="/dashboard/ea/activations" class="btn btn-secondary">EA Activations</a>
+        <a href="/dashboard/staff-activity" class="btn btn-secondary">Staff Activity</a>
+        <a href="/dashboard/audit-logs" class="btn btn-secondary">Audit Logs</a>
+    </div>
+</div>
+
+<script>
+function toggleSection(id) {
+    const el = document.getElementById(id);
+    el.style.display = el.style.display === 'none' ? 'grid' : 'none';
+}
+</script>
+
+<%- include('partials/footer') %>

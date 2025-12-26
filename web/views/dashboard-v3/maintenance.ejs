@@ -1,0 +1,102 @@
+<%- include('partials/header') %>
+
+<div class="container mt-4">
+    <h2><i class="bi bi-wrench"></i> Database Maintenance</h2>
+    
+    <% if (typeof query !== 'undefined' && query.success === 'true') { %>
+        <div class="alert alert-success alert-dismissible fade show">
+            <i class="bi bi-check-circle"></i> Maintenance completed successfully!
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <% } %>
+    
+    <div class="row">
+        <!-- Stats Card -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-database"></i> Database Statistics
+                </div>
+                <div class="card-body">
+                    <% if (stats) { %>
+                        <table class="table table-sm">
+                            <tr>
+                                <td>Expired Cooldowns</td>
+                                <td class="text-end"><span class="badge bg-<%= stats.expiredCooldowns > 0 ? 'warning' : 'success' %>"><%= stats.expiredCooldowns %></span></td>
+                            </tr>
+                            <tr>
+                                <td>Expired Per-Game Cooldowns</td>
+                                <td class="text-end"><span class="badge bg-<%= stats.expiredPerGameCooldowns > 0 ? 'warning' : 'success' %>"><%= stats.expiredPerGameCooldowns %></span></td>
+                            </tr>
+                            <tr>
+                                <td>Old Step Changes (>7 days)</td>
+                                <td class="text-end"><span class="badge bg-<%= stats.stepChanges7Days > 1000 ? 'danger' : stats.stepChanges7Days > 100 ? 'warning' : 'success' %>"><%= stats.stepChanges7Days %></span></td>
+                            </tr>
+                            <tr>
+                                <td>Uncompressed Transcripts (>30 days)</td>
+                                <td class="text-end"><span class="badge bg-<%= stats.oldTranscripts > 1000 ? 'warning' : 'success' %>"><%= stats.oldTranscripts %></span></td>
+                            </tr>
+                            <tr>
+                                <td>Total Ticket Logs</td>
+                                <td class="text-end"><span class="badge bg-info"><%= stats.totalTicketLogs %></span></td>
+                            </tr>
+                            <tr>
+                                <td>Total Transcripts</td>
+                                <td class="text-end"><span class="badge bg-info"><%= stats.totalTranscripts %></span></td>
+                            </tr>
+                        </table>
+                    <% } else { %>
+                        <div class="text-muted">Unable to load statistics</div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Actions Card -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-gear"></i> Maintenance Actions
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <form method="post" action="/dashboard/maintenance/run" style="display:inline;">
+                            <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Run full maintenance? This will clean up expired data.')">
+                                <i class="bi bi-play-circle"></i> Run Full Maintenance
+                            </button>
+                        </form>
+                        
+                        <form method="post" action="/dashboard/maintenance/cleanup-cooldowns" style="display:inline;">
+                            <button type="submit" class="btn btn-outline-warning w-100">
+                                <i class="bi bi-clock-history"></i> Cleanup Expired Cooldowns
+                            </button>
+                        </form>
+                        
+                        <form method="post" action="/dashboard/maintenance/cleanup-logs" style="display:inline;">
+                            <button type="submit" class="btn btn-outline-secondary w-100">
+                                <i class="bi bi-trash"></i> Cleanup Old Step Changes
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-info-circle"></i> Automatic Maintenance
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>Scheduled Tasks:</strong></p>
+                    <ul class="mb-0">
+                        <li>Expired cooldowns cleaned every 15 minutes</li>
+                        <li>Full maintenance runs every hour</li>
+                        <li>Step changes older than 7 days are removed</li>
+                        <li>Token regeneration runs automatically</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('partials/footer') %>

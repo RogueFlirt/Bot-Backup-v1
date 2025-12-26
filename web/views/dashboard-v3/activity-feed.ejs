@@ -1,0 +1,143 @@
+<%- include('partials/header', { title: title }) %>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-stream"></i> Activity Feed</h1>
+        <div class="d-flex gap-2">
+            <select id="platformFilter" class="form-select" style="width: auto;" onchange="updateFilters()">
+                <option value="" <%= !platform ? 'selected' : '' %>>All Platforms</option>
+                <option value="steam" <%= platform === 'steam' ? 'selected' : '' %>>Steam</option>
+                <option value="ea" <%= platform === 'ea' ? 'selected' : '' %>>EA</option>
+                <option value="ubisoft" <%= platform === 'ubisoft' ? 'selected' : '' %>>Ubisoft</option>
+            </select>
+            <select id="limitFilter" class="form-select" style="width: auto;" onchange="updateFilters()">
+                <option value="50" <%= limit == 50 ? 'selected' : '' %>>50 Events</option>
+                <option value="100" <%= limit == 100 ? 'selected' : '' %>>100 Events</option>
+                <option value="200" <%= limit == 200 ? 'selected' : '' %>>200 Events</option>
+            </select>
+            <button class="btn btn-outline-primary" onclick="location.reload()">
+                <i class="fas fa-sync"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 80vh; overflow-y: auto;">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-dark sticky-top">
+                        <tr>
+                            <th style="width: 150px;">Time</th>
+                            <th style="width: 100px;">Platform</th>
+                            <th style="width: 120px;">Event</th>
+                            <th>User</th>
+                            <th>Game</th>
+                            <th>Staff</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (feed && feed.length > 0) { %>
+                            <% feed.forEach(function(event) { %>
+                            <tr class="<%= 
+                                event.event_type === 'completed' ? 'table-success' : 
+                                event.event_type.includes('ghost') ? 'table-warning' :
+                                event.event_type === 'rejected' ? 'table-danger' : '' 
+                            %>">
+                                <td>
+                                    <small class="text-nowrap">
+                                        <%= new Date(event.created_at).toLocaleString() %>
+                                    </small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-<%= 
+                                        event.platform === 'steam' ? 'info' : 
+                                        event.platform === 'ea' ? 'warning' : 
+                                        event.platform === 'ubisoft' ? 'success' : 'secondary' 
+                                    %>">
+                                        <%= (event.platform || 'unknown').toUpperCase() %>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-<%= 
+                                        event.event_type === 'completed' ? 'success' : 
+                                        event.event_type === 'opened' ? 'primary' :
+                                        event.event_type.includes('ghost') ? 'warning' :
+                                        event.event_type === 'rejected' ? 'danger' : 'secondary' 
+                                    %>">
+                                        <%= event.event_type %>
+                                    </span>
+                                </td>
+                                <td>
+                                    <% if (event.user_id) { %>
+                                    <a href="/dashboard/user/<%= event.user_id %>" class="text-decoration-none">
+                                        <%= event.username || 'Unknown' %>
+                                    </a>
+                                    <% } else { %>
+                                    <span class="text-muted">N/A</span>
+                                    <% } %>
+                                </td>
+                                <td><%= event.game_name || '-' %></td>
+                                <td>
+                                    <% if (event.staff_id) { %>
+                                    <a href="/dashboard/staff/<%= event.staff_id %>" class="text-decoration-none">
+                                        <%= event.staff_member || 'Staff' %>
+                                    </a>
+                                    <% } else { %>
+                                    <span class="text-muted">-</span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <% if (event.event_details) { %>
+                                    <small class="text-muted text-truncate d-inline-block" style="max-width: 200px;" title="<%= event.event_details %>">
+                                        <%= event.event_details.substring(0, 50) %><%= event.event_details.length > 50 ? '...' : '' %>
+                                    </small>
+                                    <% } %>
+                                </td>
+                            </tr>
+                            <% }); %>
+                        <% } else { %>
+                            <tr>
+                                <td colspan="7" class="text-center py-4">
+                                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">No activity found</p>
+                                </td>
+                            </tr>
+                        <% } %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="mt-3">
+        <small class="text-muted">
+            <strong>Legend:</strong>
+            <span class="badge bg-success">Completed</span>
+            <span class="badge bg-primary">Opened</span>
+            <span class="badge bg-warning">Ghost</span>
+            <span class="badge bg-danger">Rejected</span>
+            <span class="badge bg-secondary">Other</span>
+        </small>
+    </div>
+</div>
+
+<script>
+function updateFilters() {
+    const platform = document.getElementById('platformFilter').value;
+    const limit = document.getElementById('limitFilter').value;
+    let url = '?limit=' + limit;
+    if (platform) url += '&platform=' + platform;
+    window.location.href = url;
+}
+
+// Auto-refresh every 30 seconds
+setInterval(() => {
+    if (document.visibilityState === 'visible') {
+        location.reload();
+    }
+}, 30000);
+</script>
+
+<%- include('partials/footer') %>

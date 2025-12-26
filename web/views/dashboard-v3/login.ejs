@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | Pub's Lounge Dashboard</title>
+    <link rel="stylesheet" href="/dashboard/public/css/dashboard-v3.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍺</text></svg>">
+</head>
+<body>
+    <div class="login-page">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo">🍺</div>
+                <h1 class="login-title">Pub's Lounge</h1>
+                <p class="login-subtitle">Dashboard Login</p>
+            </div>
+            
+            <% if (error) { %>
+            <div class="alert alert-danger">
+                ⚠️ <%= error %>
+            </div>
+            <% } %>
+            
+            <form method="POST" action="/dashboard/login">
+                <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                <div class="form-group">
+                    <label class="form-label">Username</label>
+                    <input type="text" name="username" class="form-control" placeholder="Enter username" required autofocus>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-control" placeholder="Enter password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                    🔐 Login
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<%- include('partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title"><span class="icon">⏱️</span> Cooldowns</h1>
+    <form method="POST" action="/dashboard/cooldowns/cleanup" style="display: inline;">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <button type="submit" class="btn btn-danger btn-sm">🧹 Cleanup Expired</button>
+    </form>
+</div>
+
+<!-- Search -->
+<div class="card" style="margin-bottom: 20px;">
+    <form method="GET" style="display: flex; gap: 12px; align-items: center;">
+        <input type="text" name="search" class="form-control" placeholder="🔍 Search username or user ID..." value="<%= typeof search !== 'undefined' ? search : '' %>" style="flex: 1;">
+        <select name="type" class="form-control" style="width: 150px;">
+            <option value="">All Types</option>
+            <option value="game" <%= (typeof typeFilter !== 'undefined' && typeFilter == 'game') ? 'selected' : '' %>>Game</option>
+            <option value="global" <%= (typeof typeFilter !== 'undefined' && typeFilter == 'global') ? 'selected' : '' %>>Global</option>
+        </select>
+        <button type="submit" class="btn btn-primary">Search</button>
+        <% if ((typeof search !== 'undefined' && search) || (typeof typeFilter !== 'undefined' && typeFilter)) { %><a href="/dashboard/cooldowns" class="btn btn-secondary">Clear</a><% } %>
+    </form>
+</div>
+
+<!-- Cooldowns Table -->
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">⏱️ Active Cooldowns</span>
+        <span class="badge badge-info"><%= cooldowns ? cooldowns.length : 0 %></span>
+    </div>
+    <% if (cooldowns && cooldowns.length > 0) { %>
+    <div class="table-container">
+        <table>
+            <thead><tr><th>User</th><th>User ID</th><th>Type</th><th>Expires</th><th>Time Left</th><th>Actions</th></tr></thead>
+            <tbody>
+                <% cooldowns.slice(0, 100).forEach(cd => { 
+                    const now = new Date();
+                    const expires = new Date(cd.expires_at);
+                    const timeLeft = Math.max(0, expires - now);
+                    const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const mins = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                %>
+                <tr>
+                    <td><strong><%= cd.username || 'Unknown' %></strong></td>
+                    <td class="font-mono" style="font-size: 12px;"><%= cd.user_id %></td>
+                    <td><span class="badge badge-<%= cd.type === 'game' ? 'info' : cd.type === 'global' ? 'warning' : 'secondary' %>"><%= cd.type || 'cooldown' %></span></td>
+                    <td class="text-muted font-mono"><%= new Date(cd.expires_at).toLocaleString() %></td>
+                    <td>
+                        <% if (timeLeft > 0) { %>
+                        <span class="badge badge-<%= days > 0 ? 'danger' : hours > 0 ? 'warning' : 'success' %>">
+                            <% if (days > 0) { %><%= days %>d <% } %><% if (hours > 0) { %><%= hours %>h <% } %><%= mins %>m
+                        </span>
+                        <% } else { %><span class="badge badge-secondary">Expired</span><% } %>
+                    </td>
+                    <td>
+                        <form method="POST" action="/dashboard/cooldowns/<%= cd.id %>/clear" style="display: inline;">
+                            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Clear?')">❌</button>
+                        </form>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    <% } else { %>
+    <div class="empty-state"><div class="icon">✨</div><p>No active cooldowns</p></div>
+    <% } %>
+</div>
+
+<% if (typeof perGameCooldowns !== 'undefined' && perGameCooldowns && perGameCooldowns.length > 0) { %>
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">🎮 Per-Game Cooldowns</span>
+        <span class="badge badge-success"><%= perGameCooldowns.length %></span>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead><tr><th>User</th><th>Game</th><th>Platform</th><th>Expires</th><th>Actions</th></tr></thead>
+            <tbody>
+                <% perGameCooldowns.slice(0, 50).forEach(cd => { %>
+                <tr>
+                    <td><%= cd.username || cd.user_id %></td>
+                    <td><%= cd.game_name || cd.game_id %></td>
+                    <td><span class="badge badge-<%= cd.platform || 'steam' %>"><%= (cd.platform || 'steam').toUpperCase() %></span></td>
+                    <td class="text-muted font-mono"><%= new Date(cd.expires_at).toLocaleString() %></td>
+                    <td>
+                        <form method="POST" action="/dashboard/cooldowns/game/<%= cd.id %>/clear" style="display: inline;">
+                            <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                            <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Clear?')">❌</button>
+                        </form>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+</div>
+<% } %>
+
+<%- include('partials/footer') %>

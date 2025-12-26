@@ -1,0 +1,1023 @@
+<%- include('partials/header') %>
+
+<style>
+.file-manager { display: grid; grid-template-columns: 250px 1fr; gap: 1rem; height: calc(100vh - 200px); }
+.folder-tree { background: var(--card-bg); border-radius: 8px; padding: 1rem; overflow-y: auto; }
+.file-list-container { background: var(--card-bg); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+.file-toolbar { padding: 10px 15px; background: rgba(0,0,0,0.2); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid #333; }
+.breadcrumb { display: flex; gap: 5px; align-items: center; flex: 1; flex-wrap: wrap; }
+.breadcrumb a { color: var(--accent); text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+.breadcrumb span { color: #666; }
+.file-list { flex: 1; overflow-y: auto; }
+.file-item { display: flex; align-items: center; padding: 10px 15px; border-bottom: 1px solid #222; cursor: pointer; transition: background 0.2s; }
+.file-item:hover { background: rgba(255,255,255,0.05); }
+.file-item.selected { background: rgba(99, 102, 241, 0.2); }
+.file-icon { font-size: 1.5rem; margin-right: 12px; min-width: 30px; text-align: center; }
+.file-info { flex: 1; }
+.file-name { font-weight: 500; }
+.file-meta { font-size: 0.8rem; color: #888; margin-top: 3px; }
+.file-actions { display: flex; gap: 5px; }
+.folder-item { padding: 8px 10px; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 8px; }
+.folder-item:hover { background: rgba(255,255,255,0.1); }
+.folder-item.active { background: var(--accent); color: white; }
+.editor-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 1000; padding: 20px; }
+.editor-modal.active { display: flex; flex-direction: column; }
+.editor-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: var(--card-bg); border-radius: 8px 8px 0 0; }
+.editor-content { flex: 1; background: #1a1a2e; }
+.editor-content textarea { width: 100%; height: 100%; background: transparent; border: none; color: #fff; font-family: monospace; font-size: 13px; padding: 15px; resize: none; }
+.upload-zone { border: 2px dashed #444; border-radius: 8px; padding: 30px; text-align: center; margin: 15px; cursor: pointer; transition: all 0.3s; }
+.upload-zone:hover, .upload-zone.dragover { border-color: var(--accent); background: rgba(99, 102, 241, 0.1); }
+.upload-buttons { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+.upload-progress { margin-top: 15px; display: none; }
+.upload-progress.active { display: block; }
+.progress-bar { height: 8px; background: #333; border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); transition: width 0.3s; }
+.progress-text { font-size: 0.85rem; color: #888; margin-top: 5px; }
+</style>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">📁</span>
+        File Manager
+    </h1>
+</div>
+
+<div class="file-manager">
+    <!-- Folder Tree -->
+    <div class="folder-tree">
+        <h3 style="margin: 0 0 15px 0; font-size: 1rem;">Root Folders</h3>
+        <div id="rootFolders">
+            <div class="folder-item" onclick="loadPath('generator')">📂 generator</div>
+            <div class="folder-item" onclick="loadPath('generated')">📂 generated</div>
+            <div class="folder-item" onclick="loadPath('Steam')">📂 Steam</div>
+            <div class="folder-item" onclick="loadPath('EA')">📂 EA</div>
+            <div class="folder-item" onclick="loadPath('Ubisoft')">📂 Ubisoft</div>
+            <div class="folder-item" onclick="loadPath('sigma')">📂 sigma</div>
+            <div class="folder-item" onclick="loadPath('config')">📂 config</div>
+        </div>
+    </div>
+    
+    <!-- File List -->
+    <div class="file-list-container">
+        <div class="file-toolbar">
+            <div class="breadcrumb" id="breadcrumb">
+                <a href="#" onclick="loadPath('')">🏠 Root</a>
+            </div>
+            <button class="btn btn-sm btn-secondary" onclick="refreshFiles()">🔄 Refresh</button>
+            <button class="btn btn-sm btn-secondary" onclick="showUpload()">📤 Upload</button>
+            <button class="btn btn-sm btn-primary" onclick="showMultiUpload()">📤 Multi-Upload</button>
+            <button class="btn btn-sm btn-secondary" onclick="createFolder()">📁 New Folder</button>
+            <button class="btn btn-sm btn-secondary" onclick="createFile()">📄 New File</button>
+        </div>
+        
+        <!-- Selection toolbar (appears when items selected) -->
+        <div id="selectionToolbar" style="display: none; padding: 10px 15px; background: rgba(99, 102, 241, 0.2); border-bottom: 1px solid #333; align-items: center; gap: 10px;">
+            <span id="selectedCount" style="color: var(--accent); font-weight: 500;">0 selected</span>
+            <button class="btn btn-sm btn-danger" onclick="deleteSelected()">🗑️ Delete Selected</button>
+            <button class="btn btn-sm btn-secondary" onclick="selectAll()">✓ Select All</button>
+            <button class="btn btn-sm btn-secondary" onclick="clearSelection()">✗ Clear Selection</button>
+        </div>
+        
+        <!-- Upload Zone (hidden by default) -->
+        <div id="uploadZone" class="upload-zone" style="display: none;">
+            <input type="file" id="fileInput" multiple style="display: none;" onchange="uploadFiles(this.files)">
+            <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;" onchange="uploadFolder(this.files)">
+            <p>📤 Upload files or folders to current directory</p>
+            <div class="upload-buttons">
+                <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">📄 Select Files</button>
+                <button class="btn btn-success" onclick="document.getElementById('folderInput').click()">📁 Select Folder</button>
+            </div>
+            <p style="color: #888; font-size: 0.85rem; margin-top: 10px;">Or drag & drop files/folders here</p>
+            <div class="upload-progress" id="uploadProgress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                </div>
+                <div class="progress-text" id="progressText">Uploading...</div>
+            </div>
+        </div>
+        
+        <div class="file-list" id="fileList">
+            <div style="padding: 30px; text-align: center; color: #888;">
+                Select a folder to browse files
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Editor Modal -->
+<div class="editor-modal" id="editorModal">
+    <div class="editor-header">
+        <span id="editorTitle">Editing: filename.txt</span>
+        <div>
+            <button class="btn btn-success btn-sm" onclick="saveFile()">💾 Save</button>
+            <button class="btn btn-secondary btn-sm" onclick="closeEditor()">✖ Close</button>
+        </div>
+    </div>
+    <div class="editor-content">
+        <textarea id="editorContent"></textarea>
+    </div>
+</div>
+
+<!-- Multi-Upload Modal -->
+<div class="editor-modal" id="multiUploadModal">
+    <div class="editor-header">
+        <span>📤 Multi-Folder Upload</span>
+        <div>
+            <button class="btn btn-secondary btn-sm" onclick="closeMultiUpload()">✖ Close</button>
+        </div>
+    </div>
+    <div style="flex: 1; overflow-y: auto; padding: 20px; background: var(--card-bg);">
+        <div style="margin-bottom: 20px;">
+            <h3 style="margin: 0 0 10px 0;">Step 1: Select Files or Folder</h3>
+            <input type="file" id="multiFileInput" multiple style="display: none;" onchange="multiFilesSelected(this.files, false)">
+            <input type="file" id="multiFolderInput" webkitdirectory directory multiple style="display: none;" onchange="multiFilesSelected(this.files, true)">
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-primary" onclick="document.getElementById('multiFileInput').click()">📄 Select Files</button>
+                <button class="btn btn-success" onclick="document.getElementById('multiFolderInput').click()">📁 Select Folder</button>
+            </div>
+            <div id="multiFileCount" style="margin-top: 10px; color: #888;"></div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <h3 style="margin: 0 0 10px 0;">Step 2: Select Worker Base</h3>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                <button class="btn btn-sm btn-secondary worker-base-btn" onclick="loadWorkerFolders('generator', '')">Generator Workers</button>
+                <button class="btn btn-sm btn-secondary worker-base-btn" onclick="loadWorkerFolders('Steam', '')">Steam Workers</button>
+                <button class="btn btn-sm btn-secondary worker-base-btn" onclick="loadWorkerFolders('EA', '')">EA Workers</button>
+                <button class="btn btn-sm btn-secondary worker-base-btn" onclick="loadWorkerFolders('Ubisoft', '')">Ubisoft Workers</button>
+            </div>
+            
+            <div style="margin-top: 15px; padding: 10px; background: #1a1a2e; border-radius: 6px;">
+                <label style="display: block; margin-bottom: 8px; color: #888;">Subfolder (where to upload inside each worker):</label>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <input type="text" id="workerSubfolder" placeholder="Click Browse or type path (e.g., Goldbergs)" style="flex: 1; padding: 8px; background: #0d0d1a; border: 1px solid #333; border-radius: 4px; color: white;">
+                    <button class="btn btn-sm btn-primary" onclick="browseSubfolders()">📂 Browse</button>
+                    <button class="btn btn-sm btn-secondary" onclick="refreshWorkerFolders()">Apply</button>
+                </div>
+                <div id="subfolderBrowser" style="display: none; max-height: 150px; overflow-y: auto; padding: 5px; background: #0d0d1a; border-radius: 4px; margin-top: 10px;">
+                    <!-- Subfolder list will be populated here -->
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <h3 style="margin: 0 0 10px 0;">Step 3: Select Destinations</h3>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <button class="btn btn-sm btn-success" onclick="selectAllWorkers()">✓ Select All</button>
+                <button class="btn btn-sm btn-secondary" onclick="deselectAllWorkers()">✗ Deselect All</button>
+            </div>
+            <div id="workerFolderList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; max-height: 300px; overflow-y: auto; padding: 10px; background: #1a1a2e; border-radius: 6px;">
+                <div style="color: #888; grid-column: 1/-1; text-align: center; padding: 20px;">
+                    Click a base folder button above to load worker folders
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <h3 style="margin: 0 0 10px 0;">Summary</h3>
+            <div id="multiUploadSummary" style="padding: 15px; background: #1a1a2e; border-radius: 6px; color: #888;">
+                Select files and destinations to see summary
+            </div>
+        </div>
+        
+        <div class="upload-progress" id="multiUploadProgress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="multiProgressFill" style="width: 0%"></div>
+            </div>
+            <div class="progress-text" id="multiProgressText">Uploading...</div>
+        </div>
+        
+        <button class="btn btn-success btn-lg" id="multiUploadBtn" onclick="executeMultiUpload()" disabled style="width: 100%; margin-top: 15px;">
+            📤 Upload to Selected Folders
+        </button>
+    </div>
+</div>
+
+<script>
+let currentPath = '';
+let currentEditPath = '';
+let selectedItems = [];
+
+async function loadPath(folderPath) {
+    currentPath = folderPath;
+    selectedItems = [];
+    
+    try {
+        const res = await fetch('/dashboard/files/browse?path=' + encodeURIComponent(folderPath), { credentials: 'include' });
+        const data = await res.json();
+        
+        if (data.success) {
+            renderBreadcrumb(folderPath);
+            renderFileList(data.items);
+        } else {
+            showToast(data.error || 'Failed to load folder', 'error');
+        }
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+}
+
+function renderBreadcrumb(folderPath) {
+    const parts = folderPath.split('/').filter(Boolean);
+    let html = '<a href="#" onclick="loadPath(\'\')">🏠 Root</a>';
+    
+    let accumulated = '';
+    parts.forEach((part, i) => {
+        accumulated += (accumulated ? '/' : '') + part;
+        html += ' <span>/</span> ';
+        if (i === parts.length - 1) {
+            html += '<strong>' + part + '</strong>';
+        } else {
+            html += '<a href="#" onclick="loadPath(\'' + accumulated + '\')">' + part + '</a>';
+        }
+    });
+    
+    document.getElementById('breadcrumb').innerHTML = html;
+}
+
+function renderFileList(items) {
+    if (!items || items.length === 0) {
+        document.getElementById('fileList').innerHTML = '<div style="padding: 30px; text-align: center; color: #888;">📂 Empty folder</div>';
+        updateSelectionToolbar();
+        return;
+    }
+    
+    let html = '';
+    items.forEach(item => {
+        const icon = item.type === 'directory' ? '📁' : getFileIcon(item.name);
+        const meta = item.type === 'directory' ? 'Folder' : (item.size || 'File');
+        const isSelected = selectedItems.includes(item.path);
+        
+        html += `
+        <div class="file-item ${isSelected ? 'selected' : ''}" data-path="${item.path}" data-type="${item.type}" ondblclick="itemAction('${item.path}', '${item.type}', ${item.editable})">
+            <input type="checkbox" class="file-checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleSelect('${item.path}', '${item.type}')" style="margin-right: 10px; width: 18px; height: 18px; cursor: pointer;">
+            <span class="file-icon">${icon}</span>
+            <div class="file-info">
+                <div class="file-name">${item.name}</div>
+                <div class="file-meta">${meta}</div>
+            </div>
+            <div class="file-actions">
+                ${item.editable ? `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); editFile('${item.path}')">✏️ Edit</button>` : ''}
+                ${item.type === 'file' ? `<button class="btn btn-success btn-sm" onclick="event.stopPropagation(); downloadFile('${item.path}')">⬇️</button>` : ''}
+                <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteItem('${item.path}', '${item.type}')">🗑️</button>
+            </div>
+        </div>`;
+    });
+    
+    document.getElementById('fileList').innerHTML = html;
+    updateSelectionToolbar();
+}
+
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const icons = {
+        'json': '📋', 'txt': '📄', 'ini': '⚙️', 'cfg': '⚙️', 'config': '⚙️',
+        'bat': '🖥️', 'cmd': '🖥️', 'sh': '🖥️', 'ps1': '🖥️',
+        'log': '📜', 'xml': '📰', 'md': '📝',
+        'js': '🟨', 'py': '🐍', 'exe': '⚡', 'dll': '🔧'
+    };
+    return icons[ext] || '📄';
+}
+
+function itemAction(itemPath, type, editable) {
+    if (type === 'directory') {
+        loadPath(itemPath);
+    } else if (editable) {
+        editFile(itemPath);
+    } else {
+        downloadFile(itemPath);
+    }
+}
+
+async function editFile(filePath) {
+    try {
+        const res = await fetch('/dashboard/files/read?path=' + encodeURIComponent(filePath), { credentials: 'include' });
+        const data = await res.json();
+        
+        if (data.success) {
+            currentEditPath = filePath;
+            document.getElementById('editorTitle').textContent = 'Editing: ' + filePath;
+            document.getElementById('editorContent').value = data.content;
+            document.getElementById('editorModal').classList.add('active');
+        } else {
+            showToast(data.error || 'Failed to read file', 'error');
+        }
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+}
+
+async function saveFile() {
+    try {
+        const content = document.getElementById('editorContent').value;
+        const res = await fetch('/dashboard/files/write', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: currentEditPath, content }),
+            credentials: 'include'
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            showToast('File saved!', 'success');
+            closeEditor();
+        } else {
+            showToast(data.error || 'Failed to save', 'error');
+        }
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+}
+
+function closeEditor() {
+    document.getElementById('editorModal').classList.remove('active');
+    currentEditPath = '';
+}
+
+function downloadFile(filePath) {
+    window.location.href = '/dashboard/files/download?path=' + encodeURIComponent(filePath);
+}
+
+async function deleteItem(itemPath, type) {
+    if (!confirm('Delete ' + (type === 'directory' ? 'folder' : 'file') + '?\n' + itemPath)) return;
+    
+    try {
+        const res = await fetch('/dashboard/files/delete', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: itemPath, type: type }),
+            credentials: 'include'
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            showToast('Deleted!', 'success');
+            refreshFiles();
+        } else {
+            showToast(data.error || 'Failed to delete', 'error');
+        }
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+}
+
+// Selection functions for bulk operations
+function toggleSelect(itemPath, itemType) {
+    const index = selectedItems.findIndex(i => i.path === itemPath);
+    if (index === -1) {
+        selectedItems.push({ path: itemPath, type: itemType });
+    } else {
+        selectedItems.splice(index, 1);
+    }
+    updateSelectionToolbar();
+    // Update checkbox visual
+    const item = document.querySelector(`.file-item[data-path="${itemPath}"]`);
+    if (item) {
+        item.classList.toggle('selected', selectedItems.some(i => i.path === itemPath));
+    }
+}
+
+function selectAll() {
+    const items = document.querySelectorAll('.file-item');
+    selectedItems = [];
+    items.forEach(item => {
+        const path = item.dataset.path;
+        const type = item.dataset.type;
+        selectedItems.push({ path, type });
+        item.classList.add('selected');
+        const checkbox = item.querySelector('.file-checkbox');
+        if (checkbox) checkbox.checked = true;
+    });
+    updateSelectionToolbar();
+}
+
+function clearSelection() {
+    selectedItems = [];
+    document.querySelectorAll('.file-item').forEach(item => {
+        item.classList.remove('selected');
+        const checkbox = item.querySelector('.file-checkbox');
+        if (checkbox) checkbox.checked = false;
+    });
+    updateSelectionToolbar();
+}
+
+function updateSelectionToolbar() {
+    const toolbar = document.getElementById('selectionToolbar');
+    const count = selectedItems.length;
+    
+    if (count > 0) {
+        toolbar.style.display = 'flex';
+        document.getElementById('selectedCount').textContent = `${count} selected`;
+    } else {
+        toolbar.style.display = 'none';
+    }
+}
+
+async function deleteSelected() {
+    if (selectedItems.length === 0) {
+        showToast('No items selected', 'error');
+        return;
+    }
+    
+    const count = selectedItems.length;
+    if (!confirm(`Delete ${count} item(s)?\n\nThis cannot be undone.`)) return;
+    
+    try {
+        const res = await fetch('/dashboard/files/delete-bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: selectedItems }),
+            credentials: 'include'
+        });
+        const data = await res.json();
+        
+        selectedItems = [];
+        updateSelectionToolbar();
+        refreshFiles();
+        
+        if (data.success) {
+            if (data.errors && data.errors.length > 0) {
+                showToast(`Deleted ${data.deleted}/${data.total}, some failed`, 'error');
+            } else {
+                showToast(`✅ Deleted ${data.deleted} item(s)`, 'success');
+            }
+        } else {
+            showToast(data.error || 'Delete failed', 'error');
+        }
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+}
+
+async function createFolder() {
+    const name = prompt('Enter folder name:');
+    if (!name) return;
+    
+    try {
+        const res = await fetch('/dashboard/files/mkdir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: currentPath ? currentPath + '/' + name : name }),
+            credentials: 'include'
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            showToast('Folder created!', 'success');
+            refreshFiles();
+        } else {
+            showToast(data.error || 'Failed to create folder', 'error');
+        }
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+}
+
+async function createFile() {
+    const name = prompt('Enter file name (e.g., config.ini):');
+    if (!name) return;
+    
+    const filePath = currentPath ? currentPath + '/' + name : name;
+    
+    try {
+        const res = await fetch('/dashboard/files/write', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: filePath, content: '' }),
+            credentials: 'include'
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            showToast('File created!', 'success');
+            refreshFiles();
+            editFile(filePath);
+        } else {
+            showToast(data.error || 'Failed to create file', 'error');
+        }
+    } catch (err) {
+        showToast('Error: ' + err.message, 'error');
+    }
+}
+
+function showUpload() {
+    const zone = document.getElementById('uploadZone');
+    zone.style.display = zone.style.display === 'none' ? 'block' : 'none';
+}
+
+async function uploadFiles(files) {
+    if (!files || files.length === 0) return;
+    if (!currentPath) {
+        showToast('Please select a folder first', 'error');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('path', currentPath);
+    for (const file of files) {
+        formData.append('files', file);
+    }
+    
+    showProgress(true, 0, `Uploading ${files.length} file(s)...`);
+    
+    try {
+        const res = await fetch('/dashboard/files/upload', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        });
+        const data = await res.json();
+        
+        showProgress(false);
+        if (data.success) {
+            showToast('Uploaded ' + data.count + ' file(s)!', 'success');
+            document.getElementById('uploadZone').style.display = 'none';
+            document.getElementById('fileInput').value = '';
+            refreshFiles();
+        } else {
+            showToast(data.error || 'Upload failed', 'error');
+        }
+    } catch (err) {
+        showProgress(false);
+        showToast('Error: ' + err.message, 'error');
+    }
+}
+
+async function uploadFolder(files) {
+    if (!files || files.length === 0) return;
+    if (!currentPath) {
+        showToast('Please select a folder first', 'error');
+        return;
+    }
+    
+    showProgress(true, 10, `Preparing ${files.length} files...`);
+    
+    // Build form data with files and their relative paths
+    const formData = new FormData();
+    formData.append('path', currentPath);
+    
+    let fileCount = 0;
+    for (const file of files) {
+        formData.append('files', file);
+        // webkitRelativePath contains the folder structure
+        formData.append('relativePaths', file.webkitRelativePath || file.name);
+        fileCount++;
+    }
+    
+    showProgress(true, 30, `Uploading ${fileCount} files...`);
+    
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
+        
+        const res = await fetch('/dashboard/files/upload', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include',
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        showProgress(true, 90, 'Processing...');
+        
+        const data = await res.json();
+        
+        showProgress(false);
+        if (data.success) {
+            showToast('Uploaded folder with ' + data.count + ' file(s)!', 'success');
+            document.getElementById('uploadZone').style.display = 'none';
+            document.getElementById('folderInput').value = '';
+            refreshFiles();
+        } else {
+            showToast(data.error || 'Upload failed', 'error');
+        }
+    } catch (err) {
+        showProgress(false);
+        if (err.name === 'AbortError') {
+            showToast('Upload timed out - try smaller folders', 'error');
+        } else {
+            showToast('Error: ' + err.message, 'error');
+        }
+    }
+}
+
+function showProgress(show, percent = 0, text = '') {
+    const progress = document.getElementById('uploadProgress');
+    const fill = document.getElementById('progressFill');
+    const textEl = document.getElementById('progressText');
+    
+    if (show) {
+        progress.classList.add('active');
+        fill.style.width = percent + '%';
+        textEl.textContent = text;
+    } else {
+        progress.classList.remove('active');
+    }
+}
+
+function refreshFiles() {
+    loadPath(currentPath);
+}
+
+// Drag and drop
+const uploadZone = document.getElementById('uploadZone');
+uploadZone.addEventListener('dragover', (e) => { 
+    e.preventDefault(); 
+    uploadZone.classList.add('dragover'); 
+});
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    
+    // Handle both files and folders via drag & drop
+    const items = e.dataTransfer.items;
+    if (items && items.length > 0) {
+        const allFiles = [];
+        const relativePaths = [];
+        
+        // Process all dropped items
+        const processEntry = async (entry, path = '') => {
+            if (entry.isFile) {
+                return new Promise((resolve) => {
+                    entry.file((file) => {
+                        allFiles.push(file);
+                        relativePaths.push(path + file.name);
+                        resolve();
+                    });
+                });
+            } else if (entry.isDirectory) {
+                const reader = entry.createReader();
+                return new Promise((resolve) => {
+                    reader.readEntries(async (entries) => {
+                        for (const e of entries) {
+                            await processEntry(e, path + entry.name + '/');
+                        }
+                        resolve();
+                    });
+                });
+            }
+        };
+        
+        // Check if we have directory entries
+        let hasDirectories = false;
+        for (const item of items) {
+            const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+            if (entry) {
+                if (entry.isDirectory) hasDirectories = true;
+                await processEntry(entry);
+            }
+        }
+        
+        if (allFiles.length > 0) {
+            if (hasDirectories) {
+                // Upload as folder with structure
+                const formData = new FormData();
+                formData.append('path', currentPath);
+                allFiles.forEach(f => formData.append('files', f));
+                relativePaths.forEach(rp => formData.append('relativePaths', rp));
+                
+                showProgress(true, 0, `Uploading ${allFiles.length} files...`);
+                
+                try {
+                    const res = await fetch('/dashboard/files/upload', {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'include'
+                    });
+                    const data = await res.json();
+                    showProgress(false);
+                    if (data.success) {
+                        showToast('Uploaded ' + data.count + ' file(s)!', 'success');
+                        refreshFiles();
+                    } else {
+                        showToast(data.error || 'Upload failed', 'error');
+                    }
+                } catch (err) {
+                    showProgress(false);
+                    showToast('Error: ' + err.message, 'error');
+                }
+            } else {
+                // Regular file upload
+                uploadFiles(allFiles);
+            }
+        }
+    } else {
+        // Fallback for simple file drop
+        uploadFiles(e.dataTransfer.files);
+    }
+});
+
+// Toast function
+function showToast(msg, type) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; border-radius: 6px; z-index: 9999; color: white; background: ' + (type === 'error' ? '#ef4444' : '#22c55e');
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// Load root on start
+loadPath('');
+
+// ============================================================================
+// Multi-Upload Functions
+// ============================================================================
+let multiUploadFiles = [];
+let multiUploadRelativePaths = [];
+let multiUploadFolderName = '';
+let selectedWorkerFolders = [];
+let currentWorkerBase = '';
+let currentWorkerSubfolder = '';
+
+function showMultiUpload() {
+    document.getElementById('multiUploadModal').classList.add('active');
+    multiUploadFiles = [];
+    multiUploadRelativePaths = [];
+    multiUploadFolderName = '';
+    selectedWorkerFolders = [];
+    document.getElementById('multiFileCount').innerHTML = '';
+    updateMultiSummary();
+}
+
+function closeMultiUpload() {
+    document.getElementById('multiUploadModal').classList.remove('active');
+    document.getElementById('multiFileInput').value = '';
+    document.getElementById('multiFolderInput').value = '';
+    multiUploadFiles = [];
+    multiUploadRelativePaths = [];
+    multiUploadFolderName = '';
+    selectedWorkerFolders = [];
+}
+
+function multiFilesSelected(files, isFolder) {
+    multiUploadFiles = Array.from(files);
+    multiUploadRelativePaths = [];
+    multiUploadFolderName = '';
+    
+    if (isFolder && files.length > 0) {
+        // Get folder name from first file's path
+        const firstPath = files[0].webkitRelativePath || '';
+        if (firstPath) {
+            multiUploadFolderName = firstPath.split('/')[0];
+        }
+        
+        // Store relative paths for all files
+        for (const file of files) {
+            multiUploadRelativePaths.push(file.webkitRelativePath || file.name);
+        }
+        
+        document.getElementById('multiFileCount').innerHTML = `
+            <div style="color: #22c55e; font-weight: 500;">📁 Folder: ${multiUploadFolderName}</div>
+            <div style="color: #888; font-size: 0.9rem;">${files.length} file(s) inside</div>
+        `;
+    } else {
+        document.getElementById('multiFileCount').innerHTML = `<span style="color: #888;">${files.length} file(s) selected</span>`;
+    }
+    
+    updateMultiSummary();
+}
+
+async function loadWorkerFolders(base, subfolder) {
+    currentWorkerBase = base;
+    currentWorkerSubfolder = subfolder || document.getElementById('workerSubfolder').value || '';
+    
+    try {
+        const url = `/dashboard/files/worker-folders?base=${encodeURIComponent(base)}&subfolder=${encodeURIComponent(currentWorkerSubfolder)}`;
+        const res = await fetch(url, { credentials: 'include' });
+        const data = await res.json();
+        
+        if (data.success && data.folders) {
+            renderWorkerFolders(data.folders);
+        } else {
+            document.getElementById('workerFolderList').innerHTML = `<div style="color: #ef4444; padding: 20px;">${data.error || 'Failed to load folders'}</div>`;
+        }
+    } catch (err) {
+        document.getElementById('workerFolderList').innerHTML = `<div style="color: #ef4444; padding: 20px;">Error: ${err.message}</div>`;
+    }
+}
+
+function refreshWorkerFolders() {
+    if (currentWorkerBase) {
+        loadWorkerFolders(currentWorkerBase, document.getElementById('workerSubfolder').value);
+    }
+}
+
+async function browseSubfolders() {
+    if (!currentWorkerBase) {
+        showToast('Select a worker base first (Generator/Steam/EA/Ubisoft)', 'error');
+        return;
+    }
+    
+    const browser = document.getElementById('subfolderBrowser');
+    browser.style.display = 'block';
+    browser.innerHTML = '<div style="padding: 10px; color: #888;">Loading...</div>';
+    
+    try {
+        // Get first worker folder to browse its subfolders
+        const url = `/dashboard/files/worker-subfolders?base=${encodeURIComponent(currentWorkerBase)}&worker=worker-1`;
+        const res = await fetch(url, { credentials: 'include' });
+        const data = await res.json();
+        
+        if (data.success && data.subfolders) {
+            if (data.subfolders.length === 0) {
+                browser.innerHTML = '<div style="padding: 10px; color: #888;">No subfolders found</div>';
+                return;
+            }
+            
+            let html = '';
+            data.subfolders.forEach(sf => {
+                html += `
+                <div onclick="selectSubfolder('${sf.name}')" 
+                     style="padding: 8px 12px; cursor: pointer; border-radius: 4px; margin: 2px 0; 
+                            display: flex; align-items: center; gap: 8px;
+                            background: rgba(255,255,255,0.05); transition: background 0.2s;"
+                     onmouseover="this.style.background='rgba(99, 102, 241, 0.3)'" 
+                     onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+                    <span>📁</span>
+                    <span>${sf.name}</span>
+                </div>`;
+            });
+            browser.innerHTML = html;
+        } else {
+            browser.innerHTML = `<div style="padding: 10px; color: #ef4444;">${data.error || 'Failed to load'}</div>`;
+        }
+    } catch (err) {
+        browser.innerHTML = `<div style="padding: 10px; color: #ef4444;">Error: ${err.message}</div>`;
+    }
+}
+
+function selectSubfolder(name) {
+    document.getElementById('workerSubfolder').value = name;
+    document.getElementById('subfolderBrowser').style.display = 'none';
+    refreshWorkerFolders();
+}
+
+function renderWorkerFolders(folders) {
+    if (!folders || folders.length === 0) {
+        document.getElementById('workerFolderList').innerHTML = '<div style="color: #888; padding: 20px;">No worker folders found</div>';
+        return;
+    }
+    
+    let html = '';
+    folders.forEach(folder => {
+        const isSelected = selectedWorkerFolders.includes(folder.path);
+        const existsClass = folder.exists ? '' : 'opacity: 0.6;';
+        const existsNote = folder.exists ? '' : ' (will create)';
+        
+        html += `
+        <div class="worker-folder-item ${isSelected ? 'selected' : ''}" 
+             onclick="toggleWorkerFolder('${folder.path}')"
+             style="padding: 10px; background: ${isSelected ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255,255,255,0.05)'}; 
+                    border-radius: 6px; cursor: pointer; border: 2px solid ${isSelected ? '#22c55e' : 'transparent'};
+                    transition: all 0.2s; ${existsClass}">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.2rem;">${isSelected ? '✅' : '📁'}</span>
+                <div>
+                    <div style="font-weight: 500;">${folder.fullPath}</div>
+                    <div style="font-size: 0.8rem; color: #888;">${folder.path}${existsNote}</div>
+                </div>
+            </div>
+        </div>`;
+    });
+    
+    document.getElementById('workerFolderList').innerHTML = html;
+}
+
+function toggleWorkerFolder(folderPath) {
+    const index = selectedWorkerFolders.indexOf(folderPath);
+    if (index === -1) {
+        selectedWorkerFolders.push(folderPath);
+    } else {
+        selectedWorkerFolders.splice(index, 1);
+    }
+    refreshWorkerFolders();
+    updateMultiSummary();
+}
+
+function selectAllWorkers() {
+    const items = document.querySelectorAll('.worker-folder-item');
+    selectedWorkerFolders = [];
+    items.forEach(item => {
+        const path = item.getAttribute('onclick').match(/'([^']+)'/)[1];
+        selectedWorkerFolders.push(path);
+    });
+    refreshWorkerFolders();
+    updateMultiSummary();
+}
+
+function deselectAllWorkers() {
+    selectedWorkerFolders = [];
+    refreshWorkerFolders();
+    updateMultiSummary();
+}
+
+function updateMultiSummary() {
+    const fileCount = multiUploadFiles.length;
+    const folderCount = selectedWorkerFolders.length;
+    const totalCopies = fileCount * folderCount;
+    
+    let html = '';
+    if (fileCount === 0 && folderCount === 0) {
+        html = '<span style="color: #888;">Select files/folder and destinations to see summary</span>';
+    } else {
+        // Show folder name if it's a folder upload
+        if (multiUploadFolderName) {
+            html = `
+                <div style="margin-bottom: 15px; padding: 10px; background: rgba(34, 197, 94, 0.2); border-radius: 6px;">
+                    <div style="font-weight: 500; color: #22c55e;">📁 Uploading Folder: ${multiUploadFolderName}</div>
+                    <div style="font-size: 0.9rem; color: #888;">${fileCount} files inside will be copied to ${folderCount} destinations</div>
+                </div>
+            `;
+        }
+        
+        html += `
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center;">
+                <div>
+                    <div style="font-size: 2rem; color: var(--accent);">${fileCount}</div>
+                    <div style="color: #888;">Files</div>
+                </div>
+                <div>
+                    <div style="font-size: 2rem; color: var(--accent);">${folderCount}</div>
+                    <div style="color: #888;">Destinations</div>
+                </div>
+                <div>
+                    <div style="font-size: 2rem; color: #22c55e;">${totalCopies}</div>
+                    <div style="color: #888;">Total Copies</div>
+                </div>
+            </div>
+        `;
+        
+        // Show file list only for non-folder uploads
+        if (fileCount > 0 && !multiUploadFolderName) {
+            html += '<div style="margin-top: 15px; color: #888;">Files: ' + multiUploadFiles.map(f => f.name).join(', ') + '</div>';
+        }
+    }
+    
+    document.getElementById('multiUploadSummary').innerHTML = html;
+    document.getElementById('multiUploadBtn').disabled = (fileCount === 0 || folderCount === 0);
+}
+
+async function executeMultiUpload() {
+    if (multiUploadFiles.length === 0 || selectedWorkerFolders.length === 0) {
+        showToast('Select files and destinations first', 'error');
+        return;
+    }
+    
+    const progress = document.getElementById('multiUploadProgress');
+    const fill = document.getElementById('multiProgressFill');
+    const text = document.getElementById('multiProgressText');
+    
+    progress.classList.add('active');
+    fill.style.width = '10%';
+    text.textContent = 'Preparing upload...';
+    
+    const formData = new FormData();
+    formData.append('destinations', JSON.stringify(selectedWorkerFolders));
+    
+    // Add files
+    multiUploadFiles.forEach((file, index) => {
+        formData.append('files', file);
+        // If we have relative paths (folder upload), include them
+        if (multiUploadRelativePaths.length > 0 && multiUploadRelativePaths[index]) {
+            formData.append('relativePaths', multiUploadRelativePaths[index]);
+        }
+    });
+    
+    const folderInfo = multiUploadFolderName ? ` (${multiUploadFolderName})` : '';
+    fill.style.width = '30%';
+    text.textContent = `Uploading ${multiUploadFiles.length} file(s)${folderInfo} to ${selectedWorkerFolders.length} folders...`;
+    
+    try {
+        const res = await fetch('/dashboard/files/upload-multi', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        });
+        
+        fill.style.width = '90%';
+        text.textContent = 'Processing...';
+        
+        const data = await res.json();
+        
+        progress.classList.remove('active');
+        
+        if (data.success) {
+            const msg = multiUploadFolderName 
+                ? `✅ Uploaded folder "${multiUploadFolderName}" to ${data.destinations} locations`
+                : `✅ Uploaded ${data.files} file(s) to ${data.destinations} folders (${data.count} total copies)`;
+            showToast(msg, 'success');
+            closeMultiUpload();
+            refreshFiles();
+        } else {
+            showToast(data.error || 'Upload failed', 'error');
+        }
+    } catch (err) {
+        progress.classList.remove('active');
+        showToast('Error: ' + err.message, 'error');
+    }
+}
+</script>
+
+<%- include('partials/footer') %>

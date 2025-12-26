@@ -1,0 +1,146 @@
+<%- include('partials/header') %>
+
+<div class="container mt-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/dashboard/user-search">User Search</a></li>
+            <li class="breadcrumb-item active">User Profile</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- User Info Card -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-person-circle"></i> User Information
+                </div>
+                <div class="card-body">
+                    <h5><%= profile.username || 'Unknown User' %></h5>
+                    <p class="text-muted mb-2"><code><%= profile.user_id %></code></p>
+                    <p class="mb-1"><strong>Last Seen:</strong> <%= profile.last_seen ? new Date(profile.last_seen).toLocaleString() : 'N/A' %></p>
+                </div>
+            </div>
+            
+            <!-- Ticket Stats -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-ticket"></i> Ticket Statistics
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <h4 class="text-primary"><%= profile.tickets?.steam || 0 %></h4>
+                            <small>Steam</small>
+                        </div>
+                        <div class="col-4">
+                            <h4 class="text-warning"><%= profile.tickets?.ea || 0 %></h4>
+                            <small>EA</small>
+                        </div>
+                        <div class="col-4">
+                            <h4 class="text-info"><%= profile.tickets?.ubisoft || 0 %></h4>
+                            <small>Ubisoft</small>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="text-center">
+                        <h4><%= profile.tickets?.total || 0 %></h4>
+                        <small>Total Tickets</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="col-md-8">
+            <!-- Active Cooldowns -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between">
+                    <span><i class="bi bi-clock-history"></i> Active Cooldowns</span>
+                    <span class="badge bg-secondary"><%= (profile.cooldowns?.length || 0) + (profile.perGameCooldowns?.length || 0) %></span>
+                </div>
+                <div class="card-body p-0">
+                    <% if ((profile.cooldowns && profile.cooldowns.length > 0) || (profile.perGameCooldowns && profile.perGameCooldowns.length > 0)) { %>
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Expires</th>
+                                    <th>Remaining</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% if (profile.cooldowns) profile.cooldowns.forEach(function(cd) { 
+                                    const expires = new Date(cd.expires_at);
+                                    const remaining = Math.max(0, Math.ceil((expires - new Date()) / (1000 * 60 * 60)));
+                                %>
+                                <tr>
+                                    <td><span class="badge bg-warning"><%= cd.cooldown_type %></span></td>
+                                    <td><%= expires.toLocaleString() %></td>
+                                    <td><%= remaining %>h</td>
+                                </tr>
+                                <% }); %>
+                                <% if (profile.perGameCooldowns) profile.perGameCooldowns.forEach(function(cd) { 
+                                    const expires = new Date(cd.expires_at);
+                                    const remaining = Math.max(0, Math.ceil((expires - new Date()) / (1000 * 60 * 60)));
+                                %>
+                                <tr>
+                                    <td><span class="badge bg-info">Per-Game: <%= cd.game_id %></span></td>
+                                    <td><%= expires.toLocaleString() %></td>
+                                    <td><%= remaining %>h</td>
+                                </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    <% } else { %>
+                        <div class="p-3 text-center text-muted">No active cooldowns</div>
+                    <% } %>
+                </div>
+            </div>
+            
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-clock"></i> Recent Activity
+                </div>
+                <div class="card-body p-0">
+                    <% if (profile.recentActivity && profile.recentActivity.length > 0) { %>
+                        <table class="table table-sm table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Platform</th>
+                                    <th>Game</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% profile.recentActivity.forEach(function(activity) { %>
+                                <tr>
+                                    <td>
+                                        <% if (activity.platform === 'steam') { %>
+                                            <span class="badge bg-primary">Steam</span>
+                                        <% } else if (activity.platform === 'ea') { %>
+                                            <span class="badge bg-warning">EA</span>
+                                        <% } else { %>
+                                            <span class="badge bg-info">Ubisoft</span>
+                                        <% } %>
+                                    </td>
+                                    <td><%= activity.game_name || 'Unknown' %></td>
+                                    <td><%= activity.status || 'N/A' %></td>
+                                    <td><%= activity.created_at ? new Date(activity.created_at).toLocaleString() : 'N/A' %></td>
+                                </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    <% } else { %>
+                        <div class="p-3 text-center text-muted">No recent activity</div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- include('partials/footer') %>

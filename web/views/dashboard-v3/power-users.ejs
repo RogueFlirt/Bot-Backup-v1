@@ -1,0 +1,109 @@
+<%- include('partials/header', { title: title }) %>
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-star text-warning"></i> Power Users</h1>
+        <div class="d-flex gap-2">
+            <select id="daysFilter" class="form-select" style="width: auto;" onchange="updateFilters()">
+                <option value="7" <%= days == 7 ? 'selected' : '' %>>Last 7 Days</option>
+                <option value="30" <%= days == 30 ? 'selected' : '' %>>Last 30 Days</option>
+                <option value="90" <%= days == 90 ? 'selected' : '' %>>Last 90 Days</option>
+            </select>
+            <select id="limitFilter" class="form-select" style="width: auto;" onchange="updateFilters()">
+                <option value="20" <%= limit == 20 ? 'selected' : '' %>>Top 20</option>
+                <option value="50" <%= limit == 50 ? 'selected' : '' %>>Top 50</option>
+                <option value="100" <%= limit == 100 ? 'selected' : '' %>>Top 100</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3><%= users.length %></h3>
+                    <p class="mb-0">Users Shown</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3><%= users.reduce((s, u) => s + u.activation_count, 0) %></h3>
+                    <p class="mb-0">Total Activations</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3><%= users.length > 0 ? Math.round(users.reduce((s, u) => s + u.activation_count, 0) / users.length) : 0 %></h3>
+                    <p class="mb-0">Avg Activations</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <% if (users && users.length > 0) { %>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Username</th>
+                            <th>User ID</th>
+                            <th>Activations</th>
+                            <th>Unique Games</th>
+                            <th>First Seen</th>
+                            <th>Last Active</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% users.forEach(function(user, index) { %>
+                        <tr>
+                            <td>
+                                <% if (index === 0) { %>
+                                    <span class="badge bg-warning text-dark"><i class="fas fa-crown"></i></span>
+                                <% } else if (index < 3) { %>
+                                    <span class="badge bg-secondary"><%= index + 1 %></span>
+                                <% } else { %>
+                                    <%= index + 1 %>
+                                <% } %>
+                            </td>
+                            <td><strong><%= user.username %></strong></td>
+                            <td><code><%= user.user_id %></code></td>
+                            <td><span class="badge bg-success fs-6"><%= user.activation_count %></span></td>
+                            <td><%= user.unique_games || 'N/A' %></td>
+                            <td><small><%= user.first_seen ? new Date(user.first_seen).toLocaleDateString() : 'N/A' %></small></td>
+                            <td><small><%= user.last_active ? new Date(user.last_active).toLocaleString() : 'N/A' %></small></td>
+                            <td>
+                                <a href="/dashboard/user/<%= user.user_id %>" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye"></i> View Profile
+                                </a>
+                            </td>
+                        </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+            <% } else { %>
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> No power users found for the selected period.
+            </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateFilters() {
+    const days = document.getElementById('daysFilter').value;
+    const limit = document.getElementById('limitFilter').value;
+    window.location.href = '?days=' + days + '&limit=' + limit;
+}
+</script>
+
+<%- include('partials/footer') %>

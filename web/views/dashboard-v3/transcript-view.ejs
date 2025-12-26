@@ -1,0 +1,391 @@
+<%- include('partials/header') %>
+
+<style>
+.transcript-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.ticket-info {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.ticket-info-main h2 {
+    margin: 0 0 4px 0;
+    font-size: 1.1rem;
+    color: #fff;
+}
+
+.ticket-info-main .meta {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.ticket-info-badge {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-steam { background: rgba(102, 192, 244, 0.2); color: #66c0f4; }
+.badge-ubisoft { background: rgba(0, 112, 255, 0.2); color: #0070ff; }
+.badge-ea { background: rgba(255, 69, 58, 0.2); color: #ff453a; }
+
+.messages-container {
+    background: #36393f;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.messages-header {
+    background: #2f3136;
+    padding: 12px 16px;
+    border-bottom: 1px solid #202225;
+    font-weight: 600;
+    color: #fff;
+}
+
+.messages-list {
+    max-height: 600px;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.message {
+    display: flex;
+    gap: 16px;
+    padding: 8px 0;
+    margin-bottom: 4px;
+}
+
+.message:hover {
+    background: rgba(4, 4, 5, 0.07);
+    margin: 0 -16px;
+    padding: 8px 16px;
+    border-radius: 4px;
+}
+
+.message-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.message-avatar.bot {
+    background: #5865f2;
+}
+
+.message-avatar.user {
+    background: #3ba55c;
+}
+
+.message-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.message-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.message-author {
+    font-weight: 600;
+    color: #fff;
+}
+
+.message-author.bot {
+    color: #5865f2;
+}
+
+.message-timestamp {
+    font-size: 0.75rem;
+    color: #72767d;
+}
+
+.message-text {
+    color: #dcddde;
+    line-height: 1.4;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.message-embed {
+    background: #2f3136;
+    border-left: 4px solid #5865f2;
+    border-radius: 4px;
+    padding: 12px;
+    margin-top: 8px;
+    max-width: 520px;
+}
+
+.embed-title {
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 8px;
+}
+
+.embed-description {
+    color: #dcddde;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.embed-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.embed-field-name {
+    font-weight: 600;
+    color: #fff;
+    font-size: 0.8rem;
+}
+
+.embed-field-value {
+    color: #dcddde;
+    font-size: 0.85rem;
+}
+
+.embed-image {
+    margin-top: 8px;
+    max-width: 100%;
+    border-radius: 4px;
+}
+
+.message-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.attachment {
+    background: #2f3136;
+    border: 1px solid #202225;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.attachment-image {
+    max-width: 300px;
+    max-height: 200px;
+    display: block;
+    cursor: pointer;
+}
+
+.attachment-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    color: #00aff4;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.attachment-file:hover {
+    text-decoration: underline;
+}
+
+.attachment-label {
+    font-size: 0.75rem;
+    color: #72767d;
+    padding: 4px 8px;
+}
+
+.no-messages {
+    text-align: center;
+    padding: 60px 20px;
+    color: #72767d;
+}
+
+.no-messages-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+</style>
+
+<div class="transcript-container">
+    <!-- Back button -->
+    <div style="margin-bottom: 16px;">
+        <a href="javascript:history.back()" class="btn btn-secondary btn-sm">← Back</a>
+    </div>
+
+    <!-- Ticket Info Card -->
+    <div class="ticket-info">
+        <div class="ticket-info-main">
+            <h2><%= transcript.ticket_id %></h2>
+            <div class="meta">
+                <strong><%= transcript.username || 'Unknown User' %></strong> • 
+                <%= transcript.game_name || 'Unknown Game' %>
+                <% if (transcript.account_name) { %> • Account: <%= transcript.account_name %><% } %>
+            </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <% if (transcript.platform) { %>
+            <span class="ticket-info-badge badge-<%= transcript.platform %>"><%= transcript.platform %></span>
+            <% } %>
+            <span style="color: var(--text-muted); font-size: 0.85rem;">
+                <%= transcript.created_at ? new Date(transcript.created_at).toLocaleString() : '' %>
+            </span>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="messages-container">
+        <div class="messages-header">
+            💬 Transcript (<%= messages.length %> messages)
+        </div>
+        
+        <div class="messages-list">
+            <% if (messages && messages.length > 0) { %>
+                <% 
+                // Bot user ID for detection
+                const botId = '1442445558546694154';
+                %>
+                <% messages.forEach((msg, i) => { %>
+                <%
+                    // Detect if message is from bot
+                    const isBot = msg.bot === true || msg.authorId === botId || (msg.author && msg.author.toLowerCase().includes('bot'));
+                    
+                    // Parse timestamp - could be number (ms) or ISO string
+                    let timestamp = '';
+                    if (msg.timestamp) {
+                        const ts = typeof msg.timestamp === 'number' ? new Date(msg.timestamp) : new Date(msg.timestamp);
+                        if (!isNaN(ts.getTime())) {
+                            timestamp = ts.toLocaleString();
+                        }
+                    }
+                %>
+                <div class="message">
+                    <div class="message-avatar <%= isBot ? 'bot' : 'user' %>">
+                        <%= isBot ? '🤖' : '👤' %>
+                    </div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-author <%= isBot ? 'bot' : '' %>">
+                                <%= msg.author || msg.username || (isBot ? 'Bot' : 'User') %>
+                            </span>
+                            <span class="message-timestamp">
+                                <%= timestamp %>
+                            </span>
+                        </div>
+                        
+                        <% if (msg.content && msg.content.trim()) { %>
+                        <div class="message-text"><%= msg.content.replace(/<@!?\d+>/g, '@user').replace(/<@&\d+>/g, '@role') %></div>
+                        <% } %>
+                        
+                        <!-- Embeds -->
+                        <% if (msg.embeds && msg.embeds.length > 0) { %>
+                            <% msg.embeds.forEach(embed => { %>
+                            <div class="message-embed">
+                                <% if (embed.title) { %>
+                                <div class="embed-title"><%= embed.title %></div>
+                                <% } %>
+                                <% if (embed.description) { %>
+                                <div class="embed-description"><%- embed.description.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>') %></div>
+                                <% } %>
+                                <% if (embed.fields && embed.fields.length > 0) { %>
+                                <div class="embed-fields">
+                                    <% embed.fields.forEach(field => { %>
+                                    <div>
+                                        <div class="embed-field-name"><%= field.name %></div>
+                                        <div class="embed-field-value"><%= field.value %></div>
+                                    </div>
+                                    <% }); %>
+                                </div>
+                                <% } %>
+                                <% if (embed.image && embed.image.url) { %>
+                                <img src="<%= embed.image.url %>" class="embed-image" alt="Embed image">
+                                <% } %>
+                            </div>
+                            <% }); %>
+                        <% } %>
+                        
+                        <!-- Attachments -->
+                        <% if (msg.attachments && msg.attachments.length > 0) { %>
+                        <div class="message-attachments">
+                            <% msg.attachments.forEach(att => { %>
+                                <% 
+                                // Handle both string URLs and object formats
+                                let attUrl = '';
+                                let attName = 'attachment';
+                                
+                                if (typeof att === 'string') {
+                                    // EA format: plain URL string
+                                    attUrl = att;
+                                    // Extract filename from URL
+                                    try {
+                                        const urlParts = att.split('/');
+                                        const lastPart = urlParts[urlParts.length - 1];
+                                        attName = lastPart.split('?')[0] || 'attachment';
+                                    } catch(e) {
+                                        attName = 'attachment';
+                                    }
+                                } else if (att && typeof att === 'object') {
+                                    // Steam format: object with url and name
+                                    attUrl = att.url || att.proxyURL || att.proxy_url || att.attachment || '';
+                                    attName = att.name || att.filename || att.file_name || 'attachment';
+                                }
+                                
+                                // Check if it's an image
+                                const isImage = attName.match(/\.(png|jpg|jpeg|gif|webp|bmp)$/i) || 
+                                               attUrl.match(/\.(png|jpg|jpeg|gif|webp|bmp)(\?|$)/i);
+                                %>
+                                <div class="attachment">
+                                    <% if (isImage && attUrl) { %>
+                                    <a href="<%= attUrl %>" target="_blank">
+                                        <img src="<%= attUrl %>" class="attachment-image" alt="<%= attName %>" title="Click to view full size" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                        <span style="display:none; padding: 8px 12px; color: #72767d;">📎 Image failed to load</span>
+                                    </a>
+                                    <div class="attachment-label">📎 <%= attName %></div>
+                                    <% } else if (attUrl) { %>
+                                    <a href="<%= attUrl %>" target="_blank" class="attachment-file">
+                                        📎 <%= attName %>
+                                    </a>
+                                    <% } else { %>
+                                    <span class="attachment-file" style="color: #72767d;">📎 <%= attName %></span>
+                                    <% } %>
+                                </div>
+                            <% }); %>
+                        </div>
+                        <% } %>
+                    </div>
+                </div>
+                <% }); %>
+            <% } else { %>
+            <div class="no-messages">
+                <div class="no-messages-icon">📭</div>
+                <h3 style="color: #fff; margin-bottom: 8px;">No Messages Recorded</h3>
+                <p>This ticket was completed but no messages were saved.</p>
+                <p style="font-size: 0.85rem; margin-top: 8px;">This can happen when:<br>
+                • The ticket was processed before message logging was enabled<br>
+                • The bot was restarted during the ticket<br>
+                • An error occurred during transcript creation</p>
+            </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<%- include('partials/footer') %>

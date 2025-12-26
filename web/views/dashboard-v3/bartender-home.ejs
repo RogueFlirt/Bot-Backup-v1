@@ -1,0 +1,54 @@
+<%- include('partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">⚡</span>
+        Token Generation
+    </h1>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+    <!-- Steam -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">🎮 Steam</span>
+        </div>
+        <div style="padding: 20px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 15px;">🎮</div>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">Generate Steam tokens using omega.exe</p>
+            <a href="/dashboard/steam/generate" class="btn btn-primary" style="width: 100%;">
+                ⚡ Generate Steam Token
+            </a>
+        </div>
+    </div>
+    
+    <!-- Ubisoft -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">🎯 Ubisoft</span>
+        </div>
+        <div style="padding: 20px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 15px;">🎯</div>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">Generate Ubisoft tokens using DenuvoTicket.exe</p>
+            <a href="/dashboard/ubisoft/generate" class="btn btn-primary" style="width: 100%;">
+                ⚡ Generate Ubisoft Token
+            </a>
+        </div>
+    </div>
+    
+    <!-- EA -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">🔴 EA</span>
+        </div>
+        <div style="padding: 20px; text-align: center;">
+            <div style="font-size: 48px; margin-bottom: 15px;">🔴</div>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">Generate EA tokens using EAgen.exe</p>
+            <a href="/dashboard/ea/generate" class="btn btn-primary" style="width: 100%;">
+                ⚡ Generate EA Token
+            </a>
+        </div>
+    </div>
+</div>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,196 @@
+<%- include('partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">📊</span>
+        Dashboard
+    </h1>
+    <div class="page-actions">
+        <a href="/dashboard/tickets" class="btn btn-primary">🎫 View Tickets</a>
+    </div>
+</div>
+
+<!-- Bot Status Card -->
+<div class="card bot-status-card">
+    <div class="card-header">
+        <span class="card-title">🤖 Bot Status</span>
+        <div class="card-actions">
+            <button class="btn btn-secondary btn-sm" onclick="refreshBotStatus()">🔄 Refresh</button>
+            <% if (user && user.role === 'admin') { %>
+            <button class="btn btn-danger btn-sm" onclick="restartBot()" id="restartBtn">⚡ Restart</button>
+            <% } %>
+        </div>
+    </div>
+    <div class="stats-grid bot-status-grid" id="botStatusGrid">
+        <div class="stat-card" style="border-left-color: <%= botStatus && botStatus.online ? '#23a559' : '#f04747' %>;">
+            <div class="stat-icon"><%= botStatus && botStatus.online ? '🟢' : '🔴' %></div>
+            <div class="stat-value" id="statusValue"><%= botStatus && botStatus.online ? 'Online' : 'Offline' %></div>
+            <div class="stat-label">Status</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">⏱️</div>
+            <div class="stat-value" id="uptimeValue"><%= botStatus ? botStatus.uptimeFormatted : 'N/A' %></div>
+            <div class="stat-label">Uptime</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">💾</div>
+            <div class="stat-value" id="memoryValue"><%= botStatus ? botStatus.memoryFormatted : 'N/A' %></div>
+            <div class="stat-label">Memory</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">📦</div>
+            <div class="stat-value" id="nodeValue"><%= botStatus ? botStatus.nodeVersion : 'N/A' %></div>
+            <div class="stat-label">Node.js</div>
+        </div>
+    </div>
+    <% if (botStatus && botStatus.startTime) { %>
+    <div class="card-footer-text">
+        Started: <%= new Date(botStatus.startTime).toLocaleString() %>
+    </div>
+    <% } %>
+</div>
+
+<!-- Stats Grid -->
+<div class="stats-grid">
+    <div class="stat-card steam">
+        <div class="stat-icon">🎮</div>
+        <div class="stat-value"><%= stats.steam.games %></div>
+        <div class="stat-label">Steam Games</div>
+    </div>
+    <div class="stat-card steam">
+        <div class="stat-icon">🎟️</div>
+        <div class="stat-value"><%= stats.steam.available %></div>
+        <div class="stat-label">Steam Tokens</div>
+    </div>
+    <div class="stat-card ubisoft">
+        <div class="stat-icon">🎯</div>
+        <div class="stat-value"><%= stats.ubisoft.games %></div>
+        <div class="stat-label">Ubisoft Games</div>
+    </div>
+    <div class="stat-card ubisoft">
+        <div class="stat-icon">🎟️</div>
+        <div class="stat-value"><%= stats.ubisoft.available %></div>
+        <div class="stat-label">Ubisoft Tokens</div>
+    </div>
+    <div class="stat-card ea">
+        <div class="stat-icon">🔴</div>
+        <div class="stat-value"><%= stats.ea.games %></div>
+        <div class="stat-label">EA Games</div>
+    </div>
+    <div class="stat-card ea">
+        <div class="stat-icon">🎟️</div>
+        <div class="stat-value"><%= stats.ea.available %></div>
+        <div class="stat-label">EA Tokens</div>
+    </div>
+</div>
+
+<!-- Two Column Layout -->
+<div class="two-col">
+    <!-- Open Tickets -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">🎫 Open Tickets <span class="badge badge-warning"><%= openTickets.length %></span></span>
+            <a href="/dashboard/tickets" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+        <% if (openTickets && openTickets.length > 0) { %>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Platform</th><th>User</th><th>Game</th><th>Status</th></tr></thead>
+                <tbody>
+                    <% openTickets.forEach(ticket => { %>
+                    <tr>
+                        <td><span class="badge badge-<%= ticket.platform || 'steam' %>"><%= (ticket.platform || 'steam').toUpperCase() %></span></td>
+                        <td><%= ticket.username || ticket.user_id || 'Unknown' %></td>
+                        <td><%= ticket.game_name || '-' %></td>
+                        <td><span class="badge badge-<%= ticket.status || 'open' %>"><%= ticket.status || 'open' %></span></td>
+                    </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+        <% } else { %>
+        <div class="empty-state"><div class="icon">🎉</div><p>No open tickets!</p></div>
+        <% } %>
+    </div>
+    
+    <!-- Recent Activations -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">✅ Recent Activations</span>
+            <a href="/dashboard/steam/activations" class="btn btn-secondary btn-sm">View All</a>
+        </div>
+        <% if (recentActivations && recentActivations.length > 0) { %>
+        <div class="table-container">
+            <table>
+                <thead><tr><th>Platform</th><th>User</th><th>Game</th><th>Time</th></tr></thead>
+                <tbody>
+                    <% recentActivations.forEach(act => { %>
+                    <tr>
+                        <td><span class="badge badge-<%= act.platform || 'steam' %>"><%= (act.platform || 'steam').toUpperCase() %></span></td>
+                        <td><%= act.username || act.user_id || 'Unknown' %></td>
+                        <td><%= act.game_name || '-' %></td>
+                        <td class="text-muted font-mono"><%= formatDate(act.activated_at) %></td>
+                    </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+        <% } else { %>
+        <div class="empty-state"><div class="icon">📭</div><p>No recent activations</p></div>
+        <% } %>
+    </div>
+</div>
+
+<script>
+const csrfToken = '<%= typeof csrfToken !== "undefined" ? csrfToken : "" %>';
+
+async function refreshBotStatus() {
+    try {
+        const res = await fetch('/dashboard/api/bot-status');
+        const data = await res.json();
+        if (data.success) {
+            const s = data.status;
+            document.getElementById('statusValue').textContent = s.online ? 'Online' : 'Offline';
+            document.getElementById('uptimeValue').textContent = s.uptimeFormatted || 'N/A';
+            document.getElementById('memoryValue').textContent = s.memoryFormatted || 'N/A';
+            document.getElementById('nodeValue').textContent = s.nodeVersion || 'N/A';
+        }
+    } catch (e) { console.error('Failed to refresh:', e); }
+}
+
+async function restartBot() {
+    if (!confirm('Are you sure you want to restart the bot?')) return;
+    
+    const btn = document.getElementById('restartBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Restarting...';
+    
+    try {
+        const res = await fetch('/dashboard/api/bot-restart', { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            }
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            alert('✅ Bot restart initiated!');
+            setTimeout(() => { refreshBotStatus(); btn.disabled = false; btn.textContent = '⚡ Restart Bot'; }, 5000);
+        } else {
+            alert('❌ ' + (data.error || 'Failed to restart'));
+            btn.disabled = false;
+            btn.textContent = '⚡ Restart Bot';
+        }
+    } catch (e) {
+        alert('❌ Error: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = '⚡ Restart Bot';
+    }
+}
+
+setInterval(refreshBotStatus, 30000);
+</script>
+
+<%- include('partials/footer') %>
