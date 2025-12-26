@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
+        .dashboard-container { display: flex; min-height: 100vh; }
+        .sidebar { width: 260px; background: linear-gradient(180deg, #12121a 0%, #0d0d14 100%); border-right: 1px solid #1a1a2e; position: fixed; height: 100vh; overflow-y: auto; }
+        .sidebar-header { padding: 20px; border-bottom: 1px solid #1a1a2e; display: flex; align-items: center; gap: 12px; }
+        .sidebar-header h1 { font-size: 1.1rem; color: #e94560; }
+        .sidebar-nav { padding: 15px 0; }
+        .nav-section { padding: 8px 20px; font-size: 11px; text-transform: uppercase; color: #666; font-weight: 600; margin-top: 10px; }
+        .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; color: #888; text-decoration: none; border-left: 3px solid transparent; }
+        .nav-item:hover { background: rgba(233, 69, 96, 0.1); color: #fff; }
+        .nav-item.active { background: rgba(233, 69, 96, 0.15); color: #e94560; border-left-color: #e94560; }
+        .nav-divider { height: 1px; background: #1a1a2e; margin: 10px 20px; }
+        .sidebar-footer { padding: 15px 20px; border-top: 1px solid #1a1a2e; position: absolute; bottom: 0; width: 100%; background: #0d0d14; }
+        .logout-btn { display: block; text-align: center; padding: 8px; background: rgba(220, 53, 69, 0.2); color: #dc3545; text-decoration: none; border-radius: 5px; margin-top: 10px; }
+        .main-content { flex: 1; margin-left: 260px; }
+        .content-header { padding: 20px 30px; background: #12121a; border-bottom: 1px solid #1a1a2e; display: flex; justify-content: space-between; align-items: center; }
+        .content-body { padding: 25px 30px; }
+        .card { background: #16213e; border: 1px solid #0f3460; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .card-title { font-size: 1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #0f3460; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stat-card { background: linear-gradient(135deg, #16213e 0%, #0f3460 100%); border: 1px solid #0f3460; border-radius: 10px; padding: 20px; text-align: center; }
+        .stat-card .value { font-size: 2rem; font-weight: bold; color: #e94560; }
+        .stat-card .label { font-size: 0.85rem; color: #888; margin-top: 5px; }
+        .stat-card.steam .value { color: #66c0f4; }
+        .stat-card.ubisoft .value { color: #0070ff; }
+        .stat-card.ea .value { color: #ff4747; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #0f3460; }
+        .table th { background: #0f3460; font-weight: 600; font-size: 0.85rem; }
+        .badge { padding: 4px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-steam { background: #1b2838; color: #66c0f4; }
+        .badge-ubisoft { background: #0070ff; color: #fff; }
+        .badge-ea { background: #ff4747; color: #fff; }
+        .filter-bar { display: flex; gap: 10px; margin-bottom: 20px; }
+        .filter-btn { padding: 8px 16px; background: #0f3460; border: none; color: #888; border-radius: 5px; text-decoration: none; font-size: 0.85rem; }
+        .filter-btn:hover, .filter-btn.active { background: #e94560; color: #fff; }
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 1000px) { .two-col { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <div class="sidebar-header"><span style="font-size:2rem">🍺</span><h1>Pub's Lounge</h1></div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span>📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/tickets" class="nav-item"><span>🎫</span><span>Live Tickets</span></a>
+                <div class="nav-section">🎮 Steam</div>
+                <a href="/dashboard/steam/games" class="nav-item"><span>🎮</span><span>Games</span></a>
+                <a href="/dashboard/steam/activations" class="nav-item"><span>✅</span><span>Activations</span></a>
+                <div class="nav-section">🎯 Ubisoft</div>
+                <a href="/dashboard/ubisoft/games" class="nav-item"><span>🎮</span><span>Games</span></a>
+                <a href="/dashboard/ubisoft/activations" class="nav-item"><span>✅</span><span>Activations</span></a>
+                <div class="nav-section">🔴 EA</div>
+                <a href="/dashboard/ea/games" class="nav-item"><span>🎮</span><span>Games</span></a>
+                <a href="/dashboard/ea/activations" class="nav-item"><span>✅</span><span>Activations</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item active"><span>📈</span><span>Analytics</span></a>
+                <a href="/dashboard/staff-activity" class="nav-item"><span>👥</span><span>Staff Activity</span></a>
+                <a href="/dashboard/audit-logs" class="nav-item"><span>📋</span><span>Audit Logs</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer"><div><%= user.username %></div><a href="/dashboard/logout" class="logout-btn">Logout</a></div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h2>📈 Analytics</h2>
+                <div class="filter-bar">
+                    <a href="/dashboard/analytics?days=7" class="filter-btn <%= days == 7 ? 'active' : '' %>">7 Days</a>
+                    <a href="/dashboard/analytics?days=30" class="filter-btn <%= days == 30 ? 'active' : '' %>">30 Days</a>
+                    <a href="/dashboard/analytics?days=90" class="filter-btn <%= days == 90 ? 'active' : '' %>">90 Days</a>
+                </div>
+            </header>
+            
+            <div class="content-body">
+                <div class="stats-grid">
+                    <% 
+                    const steamTickets = data.ticketsByPlatform.find(p => p.platform === 'steam')?.count || 0;
+                    const ubiTickets = data.ticketsByPlatform.find(p => p.platform === 'ubisoft')?.count || 0;
+                    const eaTickets = data.ticketsByPlatform.find(p => p.platform === 'ea')?.count || 0;
+                    const steamActivations = data.activationsByPlatform.find(p => p.platform === 'steam')?.count || 0;
+                    const ubiActivations = data.activationsByPlatform.find(p => p.platform === 'ubisoft')?.count || 0;
+                    const eaActivations = data.activationsByPlatform.find(p => p.platform === 'ea')?.count || 0;
+                    %>
+                    <div class="stat-card steam"><div class="value"><%= steamTickets %></div><div class="label">Steam Tickets</div></div>
+                    <div class="stat-card ubisoft"><div class="value"><%= ubiTickets %></div><div class="label">Ubisoft Tickets</div></div>
+                    <div class="stat-card ea"><div class="value"><%= eaTickets %></div><div class="label">EA Tickets</div></div>
+                    <div class="stat-card steam"><div class="value"><%= steamActivations %></div><div class="label">Steam Activations</div></div>
+                    <div class="stat-card ubisoft"><div class="value"><%= ubiActivations %></div><div class="label">Ubisoft Activations</div></div>
+                    <div class="stat-card ea"><div class="value"><%= eaActivations %></div><div class="label">EA Activations</div></div>
+                </div>
+                
+                <div class="two-col">
+                    <div class="card">
+                        <div class="card-title">🎮 Top Games</div>
+                        <table class="table">
+                            <thead><tr><th>Game</th><th>Platform</th><th>Activations</th></tr></thead>
+                            <tbody>
+                                <% data.topGames.forEach(g => { %>
+                                <tr>
+                                    <td><%= g.game_name %></td>
+                                    <td><span class="badge badge-<%= g.platform %>"><%= g.platform.toUpperCase() %></span></td>
+                                    <td><%= g.count %></td>
+                                </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-title">📅 Daily Breakdown</div>
+                        <table class="table">
+                            <thead><tr><th>Date</th><th>Platform</th><th>Tickets</th></tr></thead>
+                            <tbody>
+                                <% data.ticketsByDay.slice(-10).forEach(d => { %>
+                                <tr>
+                                    <td><%= d.date %></td>
+                                    <td><span class="badge badge-<%= d.platform %>"><%= d.platform.toUpperCase() %></span></td>
+                                    <td><%= d.count %></td>
+                                </tr>
+                                <% }); %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

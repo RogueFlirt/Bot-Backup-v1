@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> - Pub's Lounge</title>
+    <link rel="stylesheet" href="/dashboard/static/css/dashboard.css">
+    <style>
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 16px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+            max-width: 400px;
+        }
+        .toast.success { background: #43b581; }
+        .toast.error { background: #f23f43; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .quantity-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .quantity-btn {
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-radius: 6px;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .quantity-btn:hover { background: var(--bg-secondary); }
+        .quantity-input {
+            width: 60px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .btn.loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        .btn.loading::after {
+            content: '...';
+            animation: dots 1s infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <span class="logo">🍺</span>
+                <h1>Pub's Lounge</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item"><span class="nav-icon">📊</span><span>Dashboard</span></a>
+                <a href="/dashboard/games" class="nav-item"><span class="nav-icon">🎮</span><span>Games</span></a>
+                <a href="/dashboard/accounts" class="nav-item"><span class="nav-icon">👤</span><span>Accounts</span></a>
+                <a href="/dashboard/tokens" class="nav-item active"><span class="nav-icon">🎫</span><span>Tokens</span></a>
+                <a href="/dashboard/transcripts" class="nav-item"><span class="nav-icon">📜</span><span>Transcripts</span></a>
+                <div class="nav-divider"></div>
+                <div class="nav-section-title" style="padding: 8px 16px; font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px;">🎯 Ubisoft</div>
+                <a href="/dashboard/ubisoft-games" class="nav-item">
+                    <span class="nav-icon">🎮</span>
+                    <span>Ubisoft Games</span>
+                </a>
+                <a href="/dashboard/ubisoft-accounts" class="nav-item">
+                    <span class="nav-icon">👤</span>
+                    <span>Ubisoft Accounts</span>
+                </a>
+                <a href="/dashboard/ubisoft-tokens" class="nav-item">
+                    <span class="nav-icon">🎫</span>
+                    <span>Ubisoft Tokens</span>
+                </a>
+                <a href="/dashboard/ubisoft-activations" class="nav-item">
+                    <span class="nav-icon">✅</span>
+                    <span>Ubisoft Activations</span>
+                </a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/analytics" class="nav-item"><span class="nav-icon">📈</span><span>Analytics</span></a>
+                <a href="/dashboard/activations" class="nav-item"><span class="nav-icon">✅</span><span>Activated Users</span></a>
+                <div class="nav-divider"></div>
+                <a href="/dashboard/generate" class="nav-item"><span class="nav-icon">⚡</span><span>Generate Token</span></a>
+                <a href="/dashboard/ticket-logs" class="nav-item"><span class="nav-icon">🎫</span><span>Ticket Logs</span></a>
+                <a href="/dashboard/audit-logs" class="nav-item"><span class="nav-icon">📋</span><span>Audit Logs</span></a>
+                <a href="/dashboard/staff-activity" class="nav-item">
+                <span class="nav-icon">⏳</span>
+                <span>Staff Activity</span>
+            </a>
+            <a href="/dashboard/macros" class="nav-item">
+                <span class="nav-icon">📝</span>
+                <span>Macros</span>
+            </a>
+            <a href="/dashboard/files" class="nav-item"><span class="nav-icon">📁</span><span>File Manager</span></a>
+            </nav>
+            <% if (user) { %>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="" class="user-avatar" onerror="this.style.display='none'">
+                    <div class="user-details">
+                        <span class="user-name"><%= user.username %></span>
+                        <span class="user-role">Staff</span>
+                    </div>
+                </div>
+                <a href="/dashboard/logout" class="logout-btn">Logout</a>
+            </div>
+            <% } %>
+        </aside>
+        
+        <main class="main-content">
+            <header class="content-header">
+                <h2><%= title %></h2>
+                <div class="header-actions">
+                    <a href="/dashboard/tokens" class="btn btn-secondary">← Back to Tokens</a>
+                </div>
+            </header>
+            
+            <div class="content-body">
+                <div class="grid-2">
+                    <!-- Add Single Token -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>🎫 Add Tokens</h3>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: var(--text-muted); margin-bottom: 16px;">
+                                Add tokens for a specific game to a specific account.
+                            </p>
+                            <form id="addSingleForm">
+                                <div class="form-group">
+                                    <label class="form-label">Select Game</label>
+                                    <select name="game_id" id="singleGameId" class="form-select" required>
+                                        <option value="">Choose a game...</option>
+                                        <% games.forEach(g => { %>
+                                        <option value="<%= g.id %>"><%= g.game_name %></option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Select Account</label>
+                                    <select name="account_id" id="singleAccountId" class="form-select" required>
+                                        <option value="">Choose an account...</option>
+                                        <% accounts.forEach(a => { %>
+                                        <option value="<%= a.id %>">#<%= a.account_number %> - <%= a.account_name %></option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Quantity</label>
+                                    <div class="quantity-selector">
+                                        <button type="button" class="quantity-btn" onclick="adjustQuantity('single', -1)">−</button>
+                                        <input type="number" name="quantity" id="singleQuantity" class="form-input quantity-input" value="1" min="1" max="5" readonly>
+                                        <button type="button" class="quantity-btn" onclick="adjustQuantity('single', 1)">+</button>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary" id="addSingleBtn">➕ Add Token(s)</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Add Game to All Accounts -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>🎮 Add Game to All Accounts</h3>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: var(--text-muted); margin-bottom: 16px;">
+                                Create token slots for a specific game across ALL accounts.<br>
+                                <strong>Use when:</strong> Adding a new game to the system.
+                            </p>
+                            <form id="addGameForm">
+                                <div class="form-group">
+                                    <label class="form-label">Select Game</label>
+                                    <select name="game_id" id="bulkGameId" class="form-select" required>
+                                        <option value="">Choose a game...</option>
+                                        <% games.forEach(g => { %>
+                                        <option value="<%= g.id %>"><%= g.game_name %></option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Tokens per Account</label>
+                                    <input type="number" name="token_count" id="bulkTokenCount" class="form-input" value="1" min="1" max="10">
+                                    <small style="color: var(--text-muted);">Usually 1 token per account</small>
+                                </div>
+                                <button type="submit" class="btn btn-primary" id="addGameBtn">
+                                    ➕ Add to All Accounts (<%= accounts.length %>)
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Add All Games to Account -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>👤 Add All Games to Account</h3>
+                        </div>
+                        <div class="card-body">
+                            <p style="color: var(--text-muted); margin-bottom: 16px;">
+                                Create token slots for ALL games on a specific account.<br>
+                                <strong>Use when:</strong> Adding a new account to the system.
+                            </p>
+                            <form id="addAccountForm">
+                                <div class="form-group">
+                                    <label class="form-label">Select Account</label>
+                                    <select name="account_id" id="bulkAccountId" class="form-select" required>
+                                        <option value="">Choose an account...</option>
+                                        <% accounts.forEach(a => { %>
+                                        <option value="<%= a.id %>">#<%= a.account_number %> - <%= a.account_name %></option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary" id="addAccountBtn">
+                                    ➕ Add All Games (<%= games.length %>)
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Delete Section -->
+                <div class="card" style="margin-top: 20px; border-color: var(--accent-danger);">
+                    <div class="card-header" style="background: rgba(242, 63, 67, 0.1);">
+                        <h3>🗑️ Delete Tokens</h3>
+                    </div>
+                    <div class="card-body">
+                        <p style="color: var(--text-muted); margin-bottom: 16px;">
+                            Remove all tokens for a specific game from a specific account.<br>
+                            <strong>Use when:</strong> Removing a game from an account in omega.exe.
+                        </p>
+                        <form id="deleteForm">
+                            <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                                <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                                    <label class="form-label">Select Game</label>
+                                    <select name="game_id" id="deleteGameId" class="form-select" required>
+                                        <option value="">Choose a game...</option>
+                                        <% games.forEach(g => { %>
+                                        <option value="<%= g.id %>"><%= g.game_name %></option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                                    <label class="form-label">Select Account</label>
+                                    <select name="account_id" id="deleteAccountId" class="form-select" required>
+                                        <option value="">Choose an account...</option>
+                                        <% accounts.forEach(a => { %>
+                                        <option value="<%= a.id %>">#<%= a.account_number %> - <%= a.account_name %></option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-danger" id="deleteBtn">
+                                    🗑️ Delete Tokens
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <div class="card" style="margin-top: 20px;">
+                    <div class="card-header">
+                        <h3>📊 Current Stats</h3>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: flex; gap: 40px;">
+                            <div>
+                                <strong style="font-size: 24px;"><%= games.length %></strong>
+                                <p style="color: var(--text-muted);">Total Games</p>
+                            </div>
+                            <div>
+                                <strong style="font-size: 24px;"><%= accounts.length %></strong>
+                                <p style="color: var(--text-muted);">Total Accounts</p>
+                            </div>
+                            <div>
+                                <strong style="font-size: 24px;"><%= games.length * accounts.length %></strong>
+                                <p style="color: var(--text-muted);">Max Possible Tokens</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // Quantity selector
+        function adjustQuantity(type, delta) {
+            const input = document.getElementById(type + 'Quantity');
+            let val = parseInt(input.value) + delta;
+            if (val < 1) val = 1;
+            if (val > 5) val = 5;
+            input.value = val;
+        }
+        
+        // Toast notification
+        function showToast(message, type = 'success') {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            
+            const toast = document.createElement('div');
+            toast.className = 'toast ' + type;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.remove(), 4000);
+        }
+        
+        // Add Single Token(s)
+        document.getElementById('addSingleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('addSingleBtn');
+            const gameId = document.getElementById('singleGameId').value;
+            const accountId = document.getElementById('singleAccountId').value;
+            const quantity = document.getElementById('singleQuantity').value;
+            
+            if (!gameId || !accountId) {
+                showToast('Please select game and account', 'error');
+                return;
+            }
+            
+            btn.classList.add('loading');
+            btn.textContent = 'Adding';
+            
+            try {
+                const res = await fetch('/dashboard/tokens/add-single-ajax', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ game_id: gameId, account_id: accountId, quantity: parseInt(quantity) })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    showToast(`✅ Added ${data.added} token(s)!`, 'success');
+                } else {
+                    showToast(data.error || 'Failed to add tokens', 'error');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+            
+            btn.classList.remove('loading');
+            btn.textContent = '➕ Add Token(s)';
+        });
+        
+        // Add Game to All Accounts
+        document.getElementById('addGameForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('addGameBtn');
+            const gameId = document.getElementById('bulkGameId').value;
+            const tokenCount = document.getElementById('bulkTokenCount').value;
+            
+            if (!gameId) {
+                showToast('Please select a game', 'error');
+                return;
+            }
+            
+            if (!confirm('Add this game to ALL accounts?')) return;
+            
+            btn.classList.add('loading');
+            btn.textContent = 'Adding';
+            
+            try {
+                const res = await fetch('/dashboard/tokens/bulk-add-game-ajax', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ game_id: gameId, token_count: parseInt(tokenCount) })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    showToast(`✅ Added ${data.added} tokens to ${data.accounts} accounts!`, 'success');
+                } else {
+                    showToast(data.error || 'Failed to add tokens', 'error');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+            
+            btn.classList.remove('loading');
+            btn.textContent = '➕ Add to All Accounts (<%= accounts.length %>)';
+        });
+        
+        // Add All Games to Account
+        document.getElementById('addAccountForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('addAccountBtn');
+            const accountId = document.getElementById('bulkAccountId').value;
+            
+            if (!accountId) {
+                showToast('Please select an account', 'error');
+                return;
+            }
+            
+            if (!confirm('Add ALL games to this account?')) return;
+            
+            btn.classList.add('loading');
+            btn.textContent = 'Adding';
+            
+            try {
+                const res = await fetch('/dashboard/tokens/bulk-add-account-ajax', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ account_id: accountId })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    showToast(`✅ Added ${data.added} tokens for ${data.games} games!`, 'success');
+                } else {
+                    showToast(data.error || 'Failed to add tokens', 'error');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+            
+            btn.classList.remove('loading');
+            btn.textContent = '➕ Add All Games (<%= games.length %>)';
+        });
+        
+        // Delete Tokens
+        document.getElementById('deleteForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('deleteBtn');
+            const gameId = document.getElementById('deleteGameId').value;
+            const accountId = document.getElementById('deleteAccountId').value;
+            
+            if (!gameId || !accountId) {
+                showToast('Please select game and account', 'error');
+                return;
+            }
+            
+            if (!confirm('⚠️ Delete ALL tokens for this game on this account?\n\nThis cannot be undone!')) return;
+            
+            btn.classList.add('loading');
+            btn.textContent = 'Deleting';
+            
+            try {
+                const res = await fetch('/dashboard/tokens/delete-game-account-ajax', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ game_id: gameId, account_id: accountId })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    showToast(`✅ Deleted ${data.deleted} token(s)!`, 'success');
+                } else {
+                    showToast(data.error || 'Failed to delete tokens', 'error');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+            
+            btn.classList.remove('loading');
+            btn.textContent = '🗑️ Delete Tokens';
+        });
+    </script>
+</body>
+</html>
