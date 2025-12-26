@@ -1,0 +1,78 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">🎮</span>
+        Steam Games
+    </h1>
+    <div class="page-actions">
+        <a href="/dashboard/steam/games/add" class="btn btn-primary">➕ Add Game</a>
+    </div>
+</div>
+
+<div class="card">
+    <% if (games && games.length > 0) { %>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Game</th>
+                    <th>App ID</th>
+                    <th>Panel</th>
+                    <th>Demand</th>
+                    <th>Tokens</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% games.forEach(game => { %>
+                <tr>
+                    <td>
+                        <strong><%= game.game_name %></strong>
+                        <% if (game.folder_name) { %>
+                        <br><small class="text-muted"><%= game.folder_name %></small>
+                        <% } %>
+                    </td>
+                    <td class="font-mono"><%= game.app_id || '-' %></td>
+                    <td>
+                        <span class="badge badge-<%= game.panel_type === 'paid' ? 'warning' : 'success' %>">
+                            <%= game.panel_type || 'free' %>
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge badge-<%= game.demand_type === 'high' ? 'danger' : 'info' %>">
+                            <%= game.demand_type || 'normal' %>
+                        </span>
+                    </td>
+                    <td>
+                        <span class="font-mono"><%= game.available || 0 %></span> / <%= game.total || 0 %>
+                    </td>
+                    <td>
+                        <span class="badge badge-<%= game.enabled ? 'success' : 'danger' %>">
+                            <%= game.enabled ? 'Enabled' : 'Disabled' %>
+                        </span>
+                    </td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <a href="/dashboard/steam/games/<%= game.id %>/edit" class="btn btn-secondary btn-sm">✏️</a>
+                            <form method="POST" action="/dashboard/steam/games/<%= game.id %>/delete" data-confirm="Delete this game?" style="display:inline;">
+                                <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    <% } else { %>
+    <div class="empty-state">
+        <div class="icon">🎮</div>
+        <p>No games configured yet.</p>
+        <a href="/dashboard/steam/games/add" class="btn btn-primary mt-3">Add First Game</a>
+    </div>
+    <% } %>
+</div>
+
+<%- include('../partials/footer') %>

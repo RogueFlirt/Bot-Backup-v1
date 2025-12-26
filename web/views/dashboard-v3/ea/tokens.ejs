@@ -1,0 +1,228 @@
+<%- include('../partials/header') %>
+
+<style>
+.stats-bar { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+.stat-item { background: rgba(255,255,255,0.05); padding: 15px 25px; border-radius: 8px; text-align: center; }
+.stat-value { font-size: 24px; font-weight: bold; }
+.stat-label { font-size: 12px; color: #888; margin-top: 5px; }
+.stat-available .stat-value { color: #57F287; }
+.stat-reserved .stat-value { color: #5865F2; }
+.stat-used .stat-value { color: #FEE75C; }
+.badge-reserved { background: #5865F2; }
+.btn-reset { padding: 4px 8px; font-size: 12px; }
+.timer { font-size: 12px; }
+.timer.ready { color: #57F287; }
+.timer.used { color: #FEE75C; }
+.success-banner { background: #57F287; color: #000; padding: 12px 20px; border-radius: 8px; margin-bottom: 20px; }
+</style>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">🎟️</span>
+        EA Tokens
+    </h1>
+    <div class="page-actions">
+        <a href="/dashboard/ea/tokens/add" class="btn btn-success">➕ Add Tokens</a>
+    </div>
+</div>
+
+<% if (typeof success !== 'undefined' && success) { %>
+<div class="success-banner">
+    ✅ <%= success === 'reset' ? 'Token reset!' : success === 'deleted' ? 'Token deleted!' : success === 'used' ? 'Marked as used!' : 'Action completed!' %>
+</div>
+<% } %>
+
+<div class="stats-bar">
+    <div class="stat-item stat-available">
+        <div class="stat-value"><%= typeof stats !== 'undefined' ? stats.available : 0 %></div>
+        <div class="stat-label">Available</div>
+    </div>
+    <div class="stat-item stat-reserved">
+        <div class="stat-value"><%= typeof stats !== 'undefined' ? stats.reserved : 0 %></div>
+        <div class="stat-label">Reserved</div>
+    </div>
+    <div class="stat-item stat-used">
+        <div class="stat-value"><%= typeof stats !== 'undefined' ? stats.used : 0 %></div>
+        <div class="stat-label">Used</div>
+    </div>
+    <div class="stat-item">
+        <div class="stat-value"><%= typeof stats !== 'undefined' ? stats.total : (tokens ? tokens.length : 0) %></div>
+        <div class="stat-label">Total</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Filters</span>
+    </div>
+    <form method="GET" action="/dashboard/ea/tokens">
+        <div class="form-row">
+            <div class="form-group">
+                <select name="game" class="form-control">
+                    <option value="">All Games</option>
+                    <% if (typeof games !== 'undefined') { games.forEach(g => { %>
+                    <option value="<%= g.id %>" <%= (typeof filters !== 'undefined' && filters.game == g.id) ? 'selected' : '' %>><%= g.game_name %></option>
+                    <% }); } %>
+                </select>
+            </div>
+            <div class="form-group">
+                <select name="account" class="form-control">
+                    <option value="">All Accounts</option>
+                    <% if (typeof accounts !== 'undefined') { accounts.forEach(a => { %>
+                    <option value="<%= a.id %>" <%= (typeof filters !== 'undefined' && filters.account == a.id) ? 'selected' : '' %>><%= a.account_name %></option>
+                    <% }); } %>
+                </select>
+            </div>
+            <div class="form-group">
+                <select name="status" class="form-control">
+                    <option value="">All Status</option>
+                    <option value="available" <%= (typeof filters !== 'undefined' && filters.status === 'available') ? 'selected' : '' %>>Available</option>
+                    <option value="reserved" <%= (typeof filters !== 'undefined' && filters.status === 'reserved') ? 'selected' : '' %>>Reserved</option>
+                    <option value="used" <%= (typeof filters !== 'undefined' && filters.status === 'used') ? 'selected' : '' %>>Used</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-secondary">🔍 Filter</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Bulk Actions</span>
+    </div>
+    <div class="form-row" style="padding: 15px;">
+        <form method="POST" action="/dashboard/ea/tokens/release-reserved" style="display: inline;">
+            <button type="submit" class="btn btn-primary" onclick="return confirm('Release all reserved tokens?')">🔓 Release Reserved</button>
+        </form>
+        <form method="POST" action="/dashboard/ea/tokens/reset-all" style="display: inline; margin-left: 10px;">
+            <button type="submit" class="btn btn-danger" onclick="return confirm('Reset ALL tokens? This will clear all usage data!')">🔄 Reset All</button>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <% if (tokens && tokens.length > 0) { %>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Game</th>
+                    <th>Account</th>
+                    <th>Status</th>
+                    <th>Timer / Info</th>
+                    <th>Used By</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% 
+                const formatDate = (d) => d ? new Date(d).toLocaleString() : '-';
+                tokens.forEach(t => { 
+                    const filterGame = typeof filters !== 'undefined' ? (filters.game || '') : '';
+                    const filterStatus = typeof filters !== 'undefined' ? (filters.status || '') : '';
+                    const filterAccount = typeof filters !== 'undefined' ? (filters.account || '') : '';
+                    
+                    const isReserved = !!t.reserved_by_ticket;
+                    const isUsed = !isReserved && t.last_used_at;
+                    const isAvailable = !isReserved && !isUsed;
+                    
+                    // Calculate regen countdown
+                    let regenCountdown = '';
+                    if (isUsed) {
+                        let regenTime = null;
+                        
+                        if (t.regenerates_at) {
+                            // regenerates_at is stored as ISO string with timezone
+                            regenTime = new Date(t.regenerates_at);
+                        } else if (t.last_used_at) {
+                            // Fallback: last_used_at from SQLite datetime('now') is UTC
+                            // Append 'Z' to treat it as UTC if it doesn't have timezone info
+                            let lastUsed = t.last_used_at;
+                            if (!lastUsed.includes('Z') && !lastUsed.includes('+')) {
+                                lastUsed = lastUsed.replace(' ', 'T') + 'Z';
+                            }
+                            regenTime = new Date(new Date(lastUsed).getTime() + 24 * 60 * 60 * 1000);
+                        }
+                        
+                        if (regenTime && !isNaN(regenTime.getTime())) {
+                            const now = new Date();
+                            const diff = regenTime.getTime() - now.getTime();
+                            if (diff > 0) {
+                                const hours = Math.floor(diff / (1000 * 60 * 60));
+                                const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                                regenCountdown = `⏳ ${hours}h ${mins}m`;
+                            } else {
+                                regenCountdown = '🔄 Ready to regen';
+                            }
+                        }
+                    }
+                %>
+                <tr>
+                    <td class="font-mono">#<%= t.id %></td>
+                    <td><%= t.game_name || '-' %></td>
+                    <td><%= t.account_name || '-' %></td>
+                    <td>
+                        <% if (isReserved) { %>
+                        <span class="badge badge-reserved" title="Reserved by <%= t.reserved_by_ticket %>">🔒 reserved</span>
+                        <% } else if (isUsed) { %>
+                        <span class="badge badge-warning">used</span>
+                        <% } else { %>
+                        <span class="badge badge-success">available</span>
+                        <% } %>
+                    </td>
+                    <td>
+                        <% if (isReserved) { %>
+                        <span class="timer" style="color: #5865F2;">🎫 <%= t.reserved_by_ticket %></span>
+                        <% } else if (isUsed) { %>
+                        <span class="timer used">
+                            <%= formatDate(t.last_used_at) %>
+                            <% if (regenCountdown) { %>
+                            <br><small style="color: #f0ad4e;"><%= regenCountdown %></small>
+                            <% } %>
+                        </span>
+                        <% } else { %>
+                        <span class="timer ready">✅ Ready</span>
+                        <% } %>
+                    </td>
+                    <td><%= t.used_by_username || '-' %></td>
+                    <td>
+                        <% if (isUsed || isReserved) { %>
+                        <form method="POST" action="/dashboard/ea/tokens/<%= t.id %>/reset" style="display: inline;">
+                            <input type="hidden" name="game" value="<%= filterGame %>">
+                            <input type="hidden" name="status" value="<%= filterStatus %>">
+                            <input type="hidden" name="account" value="<%= filterAccount %>">
+                            <button type="submit" class="btn btn-sm btn-success btn-reset" title="Reset to available">🔄</button>
+                        </form>
+                        <% } else { %>
+                        <form method="POST" action="/dashboard/ea/tokens/<%= t.id %>/use" style="display: inline;">
+                            <input type="hidden" name="game" value="<%= filterGame %>">
+                            <input type="hidden" name="status" value="<%= filterStatus %>">
+                            <input type="hidden" name="account" value="<%= filterAccount %>">
+                            <button type="submit" class="btn btn-sm btn-warning btn-reset" title="Mark as used">⏱️</button>
+                        </form>
+                        <% } %>
+                        <form method="POST" action="/dashboard/ea/tokens/<%= t.id %>/delete" style="display: inline; margin-left: 4px;">
+                            <input type="hidden" name="game" value="<%= filterGame %>">
+                            <input type="hidden" name="status" value="<%= filterStatus %>">
+                            <input type="hidden" name="account" value="<%= filterAccount %>">
+                            <button type="submit" class="btn btn-sm btn-danger btn-reset" title="Delete" onclick="return confirm('Delete this token?')">🗑️</button>
+                        </form>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    <% } else { %>
+    <div class="empty-state">
+        <div class="icon">🎟️</div>
+        <p>No tokens found.</p>
+        <a href="/dashboard/ea/tokens/add" class="btn btn-primary">➕ Add Tokens</a>
+    </div>
+    <% } %>
+</div>
+
+<%- include('../partials/footer') %>

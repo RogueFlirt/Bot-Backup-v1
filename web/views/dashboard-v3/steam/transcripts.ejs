@@ -1,0 +1,77 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">📜</span>
+        Steam Transcripts
+    </h1>
+    <div style="color: var(--text-muted); font-size: 14px;">
+        Total: <strong><%= typeof totalCount !== 'undefined' ? totalCount.toLocaleString() : 0 %></strong> transcripts
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 1rem;">
+    <form method="GET" action="/dashboard/steam/transcripts" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <input type="text" name="search" class="form-control" placeholder="🔍 Search username, ticket ID, or game..." value="<%= typeof search !== 'undefined' ? search : '' %>" style="flex: 1; min-width: 200px;">
+        <select name="limit" class="form-control" style="width: 80px;">
+            <option value="30" <%= (typeof limit !== 'undefined' && limit == 30) ? 'selected' : '' %>>30</option>
+            <option value="50" <%= (typeof limit !== 'undefined' && limit == 50) ? 'selected' : '' %>>50</option>
+            <option value="100" <%= (typeof limit !== 'undefined' && limit == 100) ? 'selected' : '' %>>100</option>
+        </select>
+        <button type="submit" class="btn btn-primary">Search</button>
+        <% if (typeof search !== 'undefined' && search) { %>
+        <a href="/dashboard/steam/transcripts" class="btn btn-secondary">Clear</a>
+        <% } %>
+    </form>
+</div>
+
+<div class="card">
+    <% if (transcripts && transcripts.length > 0) { %>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Ticket ID</th>
+                    <th>User</th>
+                    <th>Game</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% transcripts.forEach(t => { %>
+                <tr>
+                    <td class="font-mono"><%= t.ticket_id %></td>
+                    <td><%= t.username || t.user_id || '-' %></td>
+                    <td><%= t.game_name || '-' %></td>
+                    <td class="text-muted font-mono"><%= formatDate(t.created_at) %></td>
+                    <td>
+                        <a href="/dashboard/transcripts/<%= t.ticket_id %>" class="btn btn-secondary btn-sm">👁 View</a>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
+    <div style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color); flex-wrap: wrap;">
+        <% if (page > 1) { %>
+        <a href="?page=1&limit=<%= limit %><%= search ? '&search=' + encodeURIComponent(search) : '' %>" class="btn btn-secondary btn-sm">« First</a>
+        <a href="?page=<%= page - 1 %>&limit=<%= limit %><%= search ? '&search=' + encodeURIComponent(search) : '' %>" class="btn btn-secondary btn-sm">← Prev</a>
+        <% } %>
+        <span style="display: flex; align-items: center; padding: 0 16px; color: var(--text-muted);">Page <%= page %> of <%= totalPages %></span>
+        <% if (page < totalPages) { %>
+        <a href="?page=<%= page + 1 %>&limit=<%= limit %><%= search ? '&search=' + encodeURIComponent(search) : '' %>" class="btn btn-secondary btn-sm">Next →</a>
+        <a href="?page=<%= totalPages %>&limit=<%= limit %><%= search ? '&search=' + encodeURIComponent(search) : '' %>" class="btn btn-secondary btn-sm">Last »</a>
+        <% } %>
+    </div>
+    <% } %>
+    <% } else { %>
+    <div class="empty-state">
+        <div class="icon">📜</div>
+        <p>No transcripts found<%= typeof search !== 'undefined' && search ? ' for "' + search + '"' : '' %>.</p>
+    </div>
+    <% } %>
+</div>
+
+<%- include('../partials/footer') %>

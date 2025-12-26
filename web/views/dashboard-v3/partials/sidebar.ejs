@@ -1,0 +1,194 @@
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <span class="sidebar-logo">🍺</span>
+        <span class="sidebar-title">Pub's Lounge</span>
+    </div>
+    
+    <nav class="sidebar-nav">
+        <% const isStaffUser = user && ['admin', 'staff'].includes(user.role); %>
+        <% const isAdminUser = user && user.role === 'admin'; %>
+        <% const isBartender = user && user.role === 'bartender'; %>
+        
+        <% if (isStaffUser) { %>
+        <!-- Main -->
+        <a href="/dashboard" class="nav-item <%= path === '/' ? 'active' : '' %>">
+            <span class="icon">📊</span>
+            <span>Dashboard</span>
+        </a>
+        <a href="/dashboard/tickets" class="nav-item <%= path.startsWith('/tickets') ? 'active' : '' %>">
+            <span class="icon">🎫</span>
+            <span>Live Tickets</span>
+        </a>
+        
+        <!-- Steam -->
+        <div class="nav-section">🎮 Steam</div>
+        <a href="/dashboard/steam/games" class="nav-item <%= path === '/steam/games' ? 'active' : '' %>">
+            <span class="icon">🎲</span>
+            <span>Games</span>
+        </a>
+        <a href="/dashboard/steam/accounts" class="nav-item <%= path === '/steam/accounts' ? 'active' : '' %>">
+            <span class="icon">👤</span>
+            <span>Accounts</span>
+        </a>
+        <a href="/dashboard/steam/tokens" class="nav-item <%= path === '/steam/tokens' ? 'active' : '' %>">
+            <span class="icon">🎟️</span>
+            <span>Tokens</span>
+        </a>
+        <a href="/dashboard/steam/transcripts" class="nav-item <%= path === '/steam/transcripts' ? 'active' : '' %>">
+            <span class="icon">📜</span>
+            <span>Transcripts</span>
+        </a>
+        <a href="/dashboard/steam/activations" class="nav-item <%= path === '/steam/activations' ? 'active' : '' %>">
+            <span class="icon">✅</span>
+            <span>Activations</span>
+        </a>
+        <a href="/dashboard/steam/generate" class="nav-item <%= path === '/steam/generate' ? 'active' : '' %>">
+            <span class="icon">⚡</span>
+            <span>Generate</span>
+        </a>
+        
+        <!-- Ubisoft -->
+        <div class="nav-section">🎯 Ubisoft</div>
+        <a href="/dashboard/ubisoft/games" class="nav-item <%= path === '/ubisoft/games' ? 'active' : '' %>">
+            <span class="icon">🎲</span>
+            <span>Games</span>
+        </a>
+        <a href="/dashboard/ubisoft/accounts" class="nav-item <%= path === '/ubisoft/accounts' ? 'active' : '' %>">
+            <span class="icon">👤</span>
+            <span>Accounts</span>
+        </a>
+        <a href="/dashboard/ubisoft/tokens" class="nav-item <%= path === '/ubisoft/tokens' ? 'active' : '' %>">
+            <span class="icon">🎟️</span>
+            <span>Tokens</span>
+        </a>
+        <a href="/dashboard/ubisoft/transcripts" class="nav-item <%= path === '/ubisoft/transcripts' ? 'active' : '' %>">
+            <span class="icon">📜</span>
+            <span>Transcripts</span>
+        </a>
+        <a href="/dashboard/ubisoft/activations" class="nav-item <%= path === '/ubisoft/activations' ? 'active' : '' %>">
+            <span class="icon">✅</span>
+            <span>Activations</span>
+        </a>
+        <a href="/dashboard/ubisoft/generate" class="nav-item <%= path === '/ubisoft/generate' ? 'active' : '' %>">
+            <span class="icon">⚡</span>
+            <span>Generate</span>
+        </a>
+        
+        <!-- EA -->
+        <div class="nav-section">🔴 EA</div>
+        <a href="/dashboard/ea/games" class="nav-item <%= path === '/ea/games' ? 'active' : '' %>">
+            <span class="icon">🎲</span>
+            <span>Games</span>
+        </a>
+        <a href="/dashboard/ea/accounts" class="nav-item <%= path === '/ea/accounts' ? 'active' : '' %>">
+            <span class="icon">👤</span>
+            <span>Accounts</span>
+        </a>
+        <a href="/dashboard/ea/tokens" class="nav-item <%= path === '/ea/tokens' ? 'active' : '' %>">
+            <span class="icon">🎟️</span>
+            <span>Tokens</span>
+        </a>
+        <a href="/dashboard/ea/transcripts" class="nav-item <%= path === '/ea/transcripts' ? 'active' : '' %>">
+            <span class="icon">📜</span>
+            <span>Transcripts</span>
+        </a>
+        <a href="/dashboard/ea/activations" class="nav-item <%= path === '/ea/activations' ? 'active' : '' %>">
+            <span class="icon">✅</span>
+            <span>Activations</span>
+        </a>
+        <a href="/dashboard/ea/generate" class="nav-item <%= path === '/ea/generate' ? 'active' : '' %>">
+            <span class="icon">⚡</span>
+            <span>Generate</span>
+        </a>
+        
+        <!-- Sigma -->
+        <div class="nav-section">📦 Sigma</div>
+        <a href="/dashboard/sigma" class="nav-item <%= path.startsWith('/sigma') ? 'active' : '' %>">
+            <span class="icon">🎮</span>
+            <span>Sigma Games</span>
+        </a>
+        
+        <div class="nav-divider"></div>
+        
+        <!-- Reports -->
+        <div class="nav-section">📈 Reports</div>
+        <a href="/dashboard/analytics" class="nav-item <%= path === '/analytics' ? 'active' : '' %>">
+            <span class="icon">📊</span>
+            <span>Analytics</span>
+        </a>
+        <a href="/dashboard/staff-activity" class="nav-item <%= path === '/staff-activity' ? 'active' : '' %>">
+            <span class="icon">👥</span>
+            <span>Staff Activity</span>
+        </a>
+        <% if (isAdminUser) { %>
+        <a href="/dashboard/audit-logs" class="nav-item <%= path === '/audit-logs' ? 'active' : '' %>">
+            <span class="icon">📋</span>
+            <span>Audit Logs</span>
+        </a>
+        <% } %>
+        
+        <div class="nav-divider"></div>
+        
+        <!-- Settings -->
+        <div class="nav-section">⚙️ Settings</div>
+        <a href="/dashboard/file-manager" class="nav-item <%= path === '/file-manager' ? 'active' : '' %>">
+            <span class="icon">📁</span>
+            <span>File Manager</span>
+        </a>
+        <a href="/dashboard/cooldowns" class="nav-item <%= path === '/cooldowns' ? 'active' : '' %>">
+            <span class="icon">⏰</span>
+            <span>Cooldowns</span>
+        </a>
+        <a href="/dashboard/macros" class="nav-item <%= path.startsWith('/macros') ? 'active' : '' %>">
+            <span class="icon">📝</span>
+            <span>Macros</span>
+        </a>
+        <% if (isAdminUser) { %>
+        <a href="/dashboard/users" class="nav-item <%= path === '/users' ? 'active' : '' %>">
+            <span class="icon">👤</span>
+            <span>Users</span>
+        </a>
+        <% } %>
+        <% } %>
+        
+        <% if (isBartender) { %>
+        <!-- Bartender - Token Generation Only -->
+        <div class="nav-section">🎮 Steam</div>
+        <a href="/dashboard/steam/generate" class="nav-item <%= path === '/steam/generate' ? 'active' : '' %>">
+            <span class="icon">⚡</span>
+            <span>Generate Tokens</span>
+        </a>
+        
+        <div class="nav-section">🎯 Ubisoft</div>
+        <a href="/dashboard/ubisoft/generate" class="nav-item <%= path === '/ubisoft/generate' ? 'active' : '' %>">
+            <span class="icon">⚡</span>
+            <span>Generate Tokens</span>
+        </a>
+        
+        <div class="nav-section">🔴 EA</div>
+        <a href="/dashboard/ea/generate" class="nav-item <%= path === '/ea/generate' ? 'active' : '' %>">
+            <span class="icon">⚡</span>
+            <span>Generate Tokens</span>
+        </a>
+        <% } %>
+        
+        <div class="nav-divider"></div>
+        <a href="/dashboard/change-password" class="nav-item <%= path === '/change-password' ? 'active' : '' %>">
+            <span class="icon">🔑</span>
+            <span>Change Password</span>
+        </a>
+    </nav>
+    
+    <% if (user) { %>
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar">👤</div>
+            <div>
+                <div class="user-name"><%= user.username %></div>
+                <div class="user-role"><%= user.role %></div>
+            </div>
+        </div>
+        <a href="/dashboard/logout" class="logout-btn">🚪 Logout</a>
+    </div>
+    <% } %>
+</aside>

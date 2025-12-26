@@ -1,0 +1,139 @@
+<%- include('partials/header') %>
+<!-- TRANSCRIPT-VIEW v3.2 - Updated Dec 7 2025 -->
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">📜</span>
+        Transcript - <%= transcript.ticket_id %>
+    </h1>
+    <div class="page-actions">
+        <a href="javascript:history.back()" class="btn btn-secondary">← Back</a>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <span class="card-title">Ticket Information</span>
+    </div>
+    <div style="padding: 1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div>
+            <strong style="color: var(--text-muted);">Ticket ID</strong>
+            <p class="font-mono"><%= transcript.ticket_id %></p>
+        </div>
+        <div>
+            <strong style="color: var(--text-muted);">User</strong>
+            <p><%= transcript.username || transcript.user_id || '-' %></p>
+        </div>
+        <div>
+            <strong style="color: var(--text-muted);">Game</strong>
+            <p><%= transcript.game_name || '-' %></p>
+        </div>
+        <div>
+            <strong style="color: var(--text-muted);">Created</strong>
+            <p><%= transcript.created_at ? new Date(transcript.created_at).toLocaleString() : '-' %></p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Messages (<%= messages.length %>)</span>
+    </div>
+    
+    <% if (messages && messages.length > 0) { %>
+    <div style="padding: 1rem; max-height: 700px; overflow-y: auto;">
+        <% messages.forEach((msg, index) => { %>
+        <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-tertiary); border-radius: 8px; border-left: 3px solid <%= msg.bot ? '#5865F2' : '#23a559' %>;">
+            <!-- Author and timestamp -->
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                <strong style="color: <%= msg.bot ? '#5865F2' : '#fff' %>;">
+                    <%= msg.bot ? '🤖 ' : '👤 ' %><%= msg.author || msg.username || 'User' %>
+                </strong>
+                <span style="color: var(--text-muted); font-size: 0.85rem;">
+                    <%= msg.timestamp ? new Date(msg.timestamp).toLocaleString() : '' %>
+                </span>
+            </div>
+            
+            <!-- Message content (if any) -->
+            <% 
+            // Clean up Discord mentions in content
+            let content = msg.content || '';
+            content = content.replace(/<@!?\d+>/g, '@user').replace(/<@&\d+>/g, '@role');
+            %>
+            <% if (content && content.trim()) { %>
+            <div style="color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; margin-bottom: 0.5rem;">
+                <%= content %>
+            </div>
+            <% } %>
+            
+            <!-- Embeds -->
+            <% if (msg.embeds && msg.embeds.length > 0) { %>
+                <% msg.embeds.forEach(embed => { %>
+                <div style="background: rgba(88, 101, 242, 0.1); border-left: 3px solid #5865F2; padding: 0.75rem; border-radius: 4px; margin-top: 0.5rem;">
+                    <% if (embed.title) { %>
+                    <div style="font-weight: 600; color: #fff; margin-bottom: 0.5rem;">
+                        <%= embed.title %>
+                    </div>
+                    <% } %>
+                    <% if (embed.description) { %>
+                    <div style="color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; font-size: 0.9rem;">
+                        <%- embed.description.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>') %>
+                    </div>
+                    <% } %>
+                    <% if (embed.fields && embed.fields.length > 0) { %>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem; margin-top: 0.5rem;">
+                        <% embed.fields.forEach(field => { %>
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.8rem; color: var(--text-muted);"><%= field.name %></div>
+                            <div style="font-size: 0.9rem;"><%= field.value %></div>
+                        </div>
+                        <% }); %>
+                    </div>
+                    <% } %>
+                    <% if (embed.image && embed.image.url) { %>
+                    <div style="margin-top: 0.5rem;">
+                        <img src="<%= embed.image.url %>" style="max-width: 100%; max-height: 300px; border-radius: 4px;" alt="Embed image">
+                    </div>
+                    <% } %>
+                </div>
+                <% }); %>
+            <% } %>
+            
+            <!-- Attachments -->
+            <% if (msg.attachments && msg.attachments.length > 0) { %>
+            <div style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                <% msg.attachments.forEach(att => { %>
+                    <% 
+                    const attUrl = att.url || att.proxyURL || att;
+                    const attName = att.name || att.filename || 'attachment';
+                    const isImage = attName.match(/\.(png|jpg|jpeg|gif|webp)$/i) || (att.contentType && att.contentType.startsWith('image'));
+                    %>
+                    <% if (isImage && attUrl) { %>
+                    <div style="margin-top: 0.5rem;">
+                        <a href="<%= attUrl %>" target="_blank">
+                            <img src="<%= attUrl %>" style="max-width: 300px; max-height: 200px; border-radius: 4px; cursor: pointer;" alt="<%= attName %>" title="Click to view full size">
+                        </a>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">📎 <%= attName %></div>
+                    </div>
+                    <% } else if (attUrl) { %>
+                    <a href="<%= attUrl %>" target="_blank" class="btn btn-sm btn-secondary" style="display: inline-flex; align-items: center; gap: 0.25rem;">
+                        📎 <%= attName %>
+                    </a>
+                    <% } else { %>
+                    <span class="badge badge-secondary">📎 <%= attName %></span>
+                    <% } %>
+                <% }); %>
+            </div>
+            <% } %>
+        </div>
+        <% }); %>
+    </div>
+    <% } else { %>
+    <div class="empty-state">
+        <div class="icon">📭</div>
+        <p>No messages in this transcript.</p>
+    </div>
+    <% } %>
+</div>
+
+<%- include('partials/footer') %>

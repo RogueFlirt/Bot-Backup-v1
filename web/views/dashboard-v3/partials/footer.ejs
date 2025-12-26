@@ -1,0 +1,85 @@
+        </main>
+    </div>
+    
+    <script>
+        // Mobile sidebar toggle
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            const toggle = document.querySelector('.mobile-menu-toggle');
+            
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+            
+            // Update hamburger icon
+            if (sidebar.classList.contains('open')) {
+                toggle.textContent = '✕';
+                document.body.style.overflow = 'hidden'; // Prevent scroll when menu open
+            } else {
+                toggle.textContent = '☰';
+                document.body.style.overflow = '';
+            }
+        }
+        
+        // Ensure sidebar is closed on mobile page load
+        (function() {
+            if (window.innerWidth <= 1024) {
+                const sidebar = document.querySelector('.sidebar');
+                const overlay = document.querySelector('.sidebar-overlay');
+                const toggle = document.querySelector('.mobile-menu-toggle');
+                if (sidebar) sidebar.classList.remove('open');
+                if (overlay) overlay.classList.remove('active');
+                if (toggle) toggle.textContent = '☰';
+            }
+        })();
+        
+        // Close sidebar when clicking a nav item on mobile
+        document.querySelectorAll('.sidebar .nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 1024) {
+                    const sidebar = document.querySelector('.sidebar');
+                    const overlay = document.querySelector('.sidebar-overlay');
+                    const toggle = document.querySelector('.mobile-menu-toggle');
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                    toggle.textContent = '☰';
+                    document.body.style.overflow = '';
+                }
+            });
+        });
+        
+        // Handle resize - close sidebar if resizing to desktop
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 1024) {
+                const sidebar = document.querySelector('.sidebar');
+                const overlay = document.querySelector('.sidebar-overlay');
+                const toggle = document.querySelector('.mobile-menu-toggle');
+                if (sidebar) sidebar.classList.remove('open');
+                if (overlay) overlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+        
+        // Auto-refresh stats every 30 seconds
+        if (document.querySelector('.stats-grid')) {
+            setInterval(() => {
+                fetch('/dashboard/api/stats')
+                    .then(r => r.json())
+                    .then(data => {
+                        console.log('Stats updated:', data);
+                    })
+                    .catch(() => {});
+            }, 30000);
+        }
+        
+        // Confirm deletes
+        document.querySelectorAll('form[data-confirm]').forEach(form => {
+            form.addEventListener('submit', (e) => {
+                if (!confirm(form.dataset.confirm || 'Are you sure?')) {
+                    e.preventDefault();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

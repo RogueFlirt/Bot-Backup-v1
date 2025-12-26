@@ -1,0 +1,86 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title"><span class="icon">✅</span> EA Activations</h1>
+    <div style="color: var(--text-muted); font-size: 14px;">Total: <strong><%= typeof totalCount !== 'undefined' ? totalCount : 0 %></strong></div>
+</div>
+
+<!-- Top Stats -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+    <div class="card" style="margin-bottom: 0; border-left: 3px solid var(--ea-color);">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <span style="font-size: 20px;">🎮</span>
+            <span style="font-weight: 600;">Top Games</span>
+        </div>
+        <% if (typeof topGames !== 'undefined' && topGames && topGames.length > 0) { %>
+        <% topGames.slice(0, 5).forEach((game, i) => { %>
+        <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+            <span><span style="color: <%= i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'var(--text-muted)' %>; margin-right: 8px;">#<%= i + 1 %></span><%= game.game_name %></span>
+            <span style="color: var(--ea-color); font-weight: bold;"><%= game.count %></span>
+        </div>
+        <% }); %>
+        <% } else { %><p class="text-muted">No data</p><% } %>
+    </div>
+    <div class="card" style="margin-bottom: 0; border-left: 3px solid var(--accent-warning);">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <span style="font-size: 20px;">👤</span>
+            <span style="font-weight: 600;">Top Users</span>
+        </div>
+        <% if (typeof topUsers !== 'undefined' && topUsers && topUsers.length > 0) { %>
+        <% topUsers.slice(0, 5).forEach((user, i) => { %>
+        <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-subtle);">
+            <span><span style="color: <%= i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'var(--text-muted)' %>; margin-right: 8px;">#<%= i + 1 %></span><%= user.username %></span>
+            <span style="color: var(--accent-warning); font-weight: bold;"><%= user.count %></span>
+        </div>
+        <% }); %>
+        <% } else { %><p class="text-muted">No data</p><% } %>
+    </div>
+</div>
+
+<!-- Search -->
+<div class="card" style="margin-bottom: 20px;">
+    <form method="GET" style="display: flex; gap: 12px; align-items: center;">
+        <input type="text" name="search" class="form-control" placeholder="🔍 Search username, ticket ID, or game..." value="<%= typeof search !== 'undefined' ? search : '' %>" style="flex: 1;">
+        <select name="limit" class="form-control" style="width: 80px;">
+            <option value="30" <%= (typeof limit !== 'undefined' && limit == 30) ? 'selected' : '' %>>30</option>
+            <option value="50" <%= (typeof limit !== 'undefined' && limit == 50) ? 'selected' : '' %>>50</option>
+            <option value="100" <%= (typeof limit !== 'undefined' && limit == 100) ? 'selected' : '' %>>100</option>
+        </select>
+        <button type="submit" class="btn btn-primary">Search</button>
+        <% if (typeof search !== 'undefined' && search) { %><a href="/dashboard/ea/activations" class="btn btn-secondary">Clear</a><% } %>
+    </form>
+</div>
+
+<!-- Table -->
+<div class="card">
+    <% if (activations && activations.length > 0) { %>
+    <div class="table-container">
+        <table>
+            <thead><tr><th>User</th><th>Game</th><th>Account</th><th>Ticket</th><th>Time</th><th>Actions</th></tr></thead>
+            <tbody>
+                <% activations.forEach(a => { %>
+                <tr>
+                    <td><%= a.username || a.user_id || '-' %></td>
+                    <td><%= a.game_name || '-' %></td>
+                    <td><%= a.account_name || '-' %></td>
+                    <td class="font-mono" style="font-size: 12px;"><%= a.ticket_id || '-' %></td>
+                    <td class="text-muted font-mono"><%= formatDate(a.activated_at) %></td>
+                    <td><% if (a.ticket_id) { %><a href="/dashboard/transcript/<%= a.ticket_id %>" class="btn btn-success btn-sm">👁 View</a><% } else { %>-<% } %></td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    <% if (typeof totalPages !== 'undefined' && totalPages > 1) { %>
+    <div style="display: flex; justify-content: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+        <% if (page > 1) { %><a href="?page=<%= page - 1 %>&limit=<%= limit %><%= search ? '&search=' + search : '' %>" class="btn btn-secondary btn-sm">← Prev</a><% } %>
+        <span style="display: flex; align-items: center; padding: 0 16px; color: var(--text-muted);">Page <%= page %> of <%= totalPages %></span>
+        <% if (page < totalPages) { %><a href="?page=<%= page + 1 %>&limit=<%= limit %><%= search ? '&search=' + search : '' %>" class="btn btn-secondary btn-sm">Next →</a><% } %>
+    </div>
+    <% } %>
+    <% } else { %>
+    <div class="empty-state"><div class="icon">✅</div><p>No activations found</p></div>
+    <% } %>
+</div>
+
+<%- include('../partials/footer') %>

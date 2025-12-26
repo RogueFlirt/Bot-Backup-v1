@@ -1,0 +1,264 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">⚡</span>
+        EA Token Generation
+    </h1>
+</div>
+
+<!-- Result Display -->
+<% if (result && result.success) { %>
+<div class="alert alert-success" style="margin-bottom: 20px;">
+    ✅ <%= result.message %>
+</div>
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <span class="card-title">📦 Token Content</span>
+        <div>
+            <button onclick="copyToken()" class="btn btn-primary btn-sm">📋 Copy</button>
+            <button onclick="downloadToken()" class="btn btn-success btn-sm">⬇️ Download</button>
+        </div>
+    </div>
+    <div style="padding: 15px;">
+        <textarea id="uploadedToken" class="form-control" rows="12" readonly style="font-family: monospace; font-size: 10px;"><%= result.tokenContent %></textarea>
+    </div>
+</div>
+<% } else if (result && !result.success) { %>
+<div class="alert alert-danger" style="margin-bottom: 20px;">
+    ❌ <%= result.message %>
+</div>
+<% } %>
+
+<!-- Queue Status -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <span class="card-title">📊 Queue Status</span>
+        <button onclick="refreshQueue()" class="btn btn-secondary btn-sm">🔄 Refresh</button>
+    </div>
+    <div id="queueStatus" style="padding: 15px;">Loading...</div>
+</div>
+
+<!-- Submit to Queue -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <span class="card-title">⚡ Submit to Bot Queue</span>
+    </div>
+    <div style="padding: 15px;">
+        <p style="color: var(--text-muted); margin-bottom: 15px;">
+            Submit a token request to the bot's generation queue. The bot will process it and save the result here.
+        </p>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Game (optional)</label>
+                <select id="gameSelect" class="form-control">
+                    <option value="">Any / Unknown</option>
+                    <% games.forEach(g => { %>
+                    <option value="<%= g.id %>" data-name="<%= g.game_name %>"><%= g.game_name %></option>
+                    <% }); %>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Token Request Data <span style="color: #ef4444;">*</span></label>
+            <textarea id="inputData" class="form-control" rows="6" placeholder="Paste the token request from the user's ticket...
+
+Example: exe:a9024f08...;dll:794be0fb...
+CQDX6AJ-EumsIhPpvCIS6X..." style="font-family: monospace;"></textarea>
+        </div>
+        
+        <button onclick="submitToQueue()" class="btn btn-primary" id="submitBtn">⚡ Submit to Queue</button>
+        <span id="submitStatus" style="margin-left: 10px;"></span>
+    </div>
+</div>
+
+<!-- Active Request -->
+<div id="activeRequest" class="card" style="margin-bottom: 20px; display: none;">
+    <div class="card-header">
+        <span class="card-title">⏳ Processing Request</span>
+    </div>
+    <div style="padding: 15px;">
+        <p><strong>Request ID:</strong> <span id="requestId">-</span></p>
+        <p><strong>Status:</strong> <span id="requestStatusText">Pending...</span></p>
+        <div style="background: var(--bg-secondary); border-radius: 4px; height: 8px; overflow: hidden; margin-top: 10px;">
+            <div id="progressBar" style="background: #5865f2; height: 100%; width: 0%; transition: width 0.3s;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Generated Token Output -->
+<div id="tokenOutput" class="card" style="margin-bottom: 20px; display: none;">
+    <div class="card-header">
+        <span class="card-title">🎉 Generated Token</span>
+        <div>
+            <button onclick="copyGenerated()" class="btn btn-primary btn-sm">📋 Copy</button>
+            <button onclick="downloadGenerated()" class="btn btn-success btn-sm">⬇️ Download</button>
+        </div>
+    </div>
+    <div style="padding: 15px;">
+        <textarea id="generatedToken" class="form-control" rows="12" readonly style="font-family: monospace; font-size: 10px;"></textarea>
+    </div>
+</div>
+
+<!-- Or Upload Existing -->
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">📁 Or Upload Existing Token File</span>
+    </div>
+    <form method="POST" action="/dashboard/ea/generate" enctype="multipart/form-data" style="padding: 15px;">
+        <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+        <div class="form-group">
+            <input type="file" name="token_file" class="form-control" accept=".bin,.txt,.json,.dat">
+        </div>
+        <button type="submit" class="btn btn-secondary">📤 Upload & View</button>
+    </form>
+</div>
+
+<script>
+let currentRequestId = null;
+let pollInterval = null;
+
+async function refreshQueue() {
+    try {
+        const res = await fetch('/dashboard/api/queue/status');
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('queueStatus').innerHTML = `
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div style="background: var(--bg-secondary); padding: 12px 16px; border-radius: 6px;">
+                        <strong>EA:</strong> ${data.ea?.pending || 0} pending
+                    </div>
+                    <div style="background: var(--bg-secondary); padding: 12px 16px; border-radius: 6px;">
+                        <strong>Ubisoft:</strong> ${data.ubisoft?.pending || 0} pending
+                    </div>
+                </div>
+            `;
+        }
+    } catch (e) {
+        document.getElementById('queueStatus').innerHTML = '<span style="color: #ef4444;">Failed to load queue status</span>';
+    }
+}
+
+async function submitToQueue() {
+    const inputData = document.getElementById('inputData').value.trim();
+    if (!inputData) {
+        alert('Please paste the token request data');
+        return;
+    }
+    
+    const gameSelect = document.getElementById('gameSelect');
+    const gameName = gameSelect.options[gameSelect.selectedIndex]?.dataset?.name || null;
+    
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('submitStatus').textContent = 'Submitting...';
+    
+    try {
+        const res = await fetch('/dashboard/api/ea/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                gameId: gameSelect.value || null,
+                gameName: gameName,
+                inputData: inputData
+            })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            currentRequestId = data.requestId;
+            document.getElementById('submitStatus').innerHTML = '<span style="color: #22c55e;">✅ Queued!</span>';
+            document.getElementById('requestId').textContent = data.requestId;
+            document.getElementById('activeRequest').style.display = 'block';
+            startPolling();
+        } else {
+            document.getElementById('submitStatus').innerHTML = `<span style="color: #ef4444;">❌ ${data.error}</span>`;
+            document.getElementById('submitBtn').disabled = false;
+        }
+    } catch (e) {
+        document.getElementById('submitStatus').innerHTML = `<span style="color: #ef4444;">❌ ${e.message}</span>`;
+        document.getElementById('submitBtn').disabled = false;
+    }
+}
+
+function startPolling() {
+    let progress = 0;
+    pollInterval = setInterval(async () => {
+        progress = Math.min(progress + 5, 90);
+        document.getElementById('progressBar').style.width = progress + '%';
+        
+        try {
+            const res = await fetch(`/dashboard/api/ea/request/${currentRequestId}`);
+            const data = await res.json();
+            
+            if (data.success && data.request) {
+                document.getElementById('requestStatusText').textContent = data.request.status;
+                
+                if (data.request.status === 'completed') {
+                    clearInterval(pollInterval);
+                    document.getElementById('progressBar').style.width = '100%';
+                    document.getElementById('progressBar').style.background = '#22c55e';
+                    document.getElementById('requestStatusText').innerHTML = '<span style="color: #22c55e;">✅ Completed!</span>';
+                    
+                    if (data.request.outputData) {
+                        document.getElementById('generatedToken').value = data.request.outputData;
+                        document.getElementById('tokenOutput').style.display = 'block';
+                    }
+                    document.getElementById('submitBtn').disabled = false;
+                    refreshQueue();
+                } else if (data.request.status === 'failed') {
+                    clearInterval(pollInterval);
+                    document.getElementById('progressBar').style.background = '#ef4444';
+                    document.getElementById('requestStatusText').innerHTML = `<span style="color: #ef4444;">❌ Failed: ${data.request.errorMessage || 'Unknown error'}</span>`;
+                    document.getElementById('submitBtn').disabled = false;
+                    refreshQueue();
+                }
+            }
+        } catch (e) {
+            console.error('Poll error:', e);
+        }
+    }, 3000);
+}
+
+function copyToken() {
+    const ta = document.getElementById('uploadedToken');
+    ta.select();
+    navigator.clipboard.writeText(ta.value);
+    alert('✅ Copied!');
+}
+
+function downloadToken() {
+    const content = document.getElementById('uploadedToken').value;
+    downloadFile(content, 'ea_token.txt');
+}
+
+function copyGenerated() {
+    const ta = document.getElementById('generatedToken');
+    ta.select();
+    navigator.clipboard.writeText(ta.value);
+    alert('✅ Copied!');
+}
+
+function downloadGenerated() {
+    const content = document.getElementById('generatedToken').value;
+    downloadFile(content, 'ea_token.txt');
+}
+
+function downloadFile(content, filename) {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Init
+refreshQueue();
+setInterval(refreshQueue, 30000);
+</script>
+
+<%- include('../partials/footer') %>

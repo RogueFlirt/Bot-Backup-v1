@@ -1,0 +1,69 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">👤</span>
+        EA Accounts
+    </h1>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Add Account</span>
+    </div>
+    <form method="POST" action="/dashboard/ea/accounts/add">
+        <div class="form-row" style="padding: 15px;">
+            <div class="form-group">
+                <input type="text" name="account_name" class="form-control" placeholder="Account name (e.g., Mitch)" required>
+            </div>
+            <div class="form-group">
+                <input type="text" name="tcno_id" class="form-control" placeholder="TCNO Account ID (UUID)">
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">➕ Add</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <% if (accounts && accounts.length > 0) { %>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Account Name</th>
+                    <th>TCNO ID</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% accounts.forEach(acc => { %>
+                <tr>
+                    <td><strong><%= acc.account_name %></strong></td>
+                    <td class="font-mono"><%= acc.tcno_id || acc.account_id || '-' %></td>
+                    <td>
+                        <span class="badge badge-<%= acc.enabled !== 0 ? 'success' : 'danger' %>">
+                            <%= acc.enabled !== 0 ? 'Active' : 'Disabled' %>
+                        </span>
+                    </td>
+                    <td>
+                        <form method="POST" action="/dashboard/ea/accounts/<%= acc.id %>/delete" data-confirm="Delete this account?" style="display:inline;">
+                            <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+                        </form>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    <% } else { %>
+    <div class="empty-state">
+        <div class="icon">👤</div>
+        <p>No accounts configured.</p>
+    </div>
+    <% } %>
+</div>
+
+<%- include('../partials/footer') %>

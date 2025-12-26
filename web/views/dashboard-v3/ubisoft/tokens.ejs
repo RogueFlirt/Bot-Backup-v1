@@ -1,0 +1,305 @@
+<%- include('../partials/header') %>
+<!-- UBISOFT-TOKENS v1.0 -->
+
+<style>
+    .timer { font-family: monospace; font-weight: bold; }
+    .timer.ready { color: var(--success); }
+    .timer.used { color: var(--warning); }
+    .btn-reset { padding: 4px 8px; font-size: 11px; }
+    .stats-bar {
+        display: flex;
+        gap: 24px;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+    }
+    .stat-box {
+        background: var(--card-bg);
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        text-align: center;
+        min-width: 100px;
+    }
+    .stat-box .value { font-size: 1.5rem; font-weight: bold; }
+    .stat-box .label { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; }
+    .success-banner {
+        background: rgba(35, 165, 89, 0.2);
+        border: 1px solid var(--success);
+        color: var(--success);
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 16px;
+    }
+    .badge-reserved { background: #5865F2; color: white; }
+    .bulk-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; }
+    .filters-row { display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1.5rem; }
+    .filters-row .form-group { flex: 1; min-width: 150px; }
+    .pagination { display: flex; justify-content: center; gap: 1rem; align-items: center; margin-top: 1.5rem; }
+    .pagination a { color: var(--primary); text-decoration: none; padding: 8px 16px; background: var(--card-bg); border-radius: 6px; }
+    .pagination a:hover { background: var(--primary); color: white; }
+    .pagination .active { color: var(--text-muted); }
+</style>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">🎟️</span>
+        Ubisoft Tokens
+    </h1>
+    <div class="page-actions">
+        <a href="/dashboard/ubisoft/tokens/add" class="btn btn-success">➕ Add Tokens</a>
+    </div>
+</div>
+
+<script>
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get('success');
+    if (success) {
+        const messages = {
+            'reset': '✅ Token reset successfully!',
+            'reset-all': '✅ All tokens reset successfully!',
+            'reset-filtered': '✅ Filtered tokens reset successfully!',
+            'released-reserved': '🔓 All reserved tokens released!',
+            'used': '⏱️ Token marked as used!',
+            'deleted': '🗑️ Token deleted successfully!',
+            'added': '✅ Tokens added successfully!'
+        };
+        if (messages[success]) {
+            document.write('<div class="success-banner">' + messages[success] + '</div>');
+        }
+        window.history.replaceState({}, '', window.location.pathname + '?' + 
+            Array.from(params.entries()).filter(([k]) => !['success', 'count'].includes(k)).map(([k,v]) => k + '=' + v).join('&'));
+    }
+</script>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+    <div class="stat-box">
+        <div class="value" style="color: var(--success);"><%= typeof stats !== 'undefined' ? stats.available : 0 %></div>
+        <div class="label">Available</div>
+    </div>
+    <div class="stat-box">
+        <div class="value" style="color: #5865F2;"><%= typeof stats !== 'undefined' ? stats.reserved : 0 %></div>
+        <div class="label">🔒 Reserved</div>
+    </div>
+    <div class="stat-box">
+        <div class="value" style="color: var(--warning);"><%= typeof stats !== 'undefined' ? stats.used : 0 %></div>
+        <div class="label">Used</div>
+    </div>
+    <div class="stat-box">
+        <div class="value" style="color: var(--primary);"><%= typeof stats !== 'undefined' ? stats.total : (tokens ? tokens.length : 0) %></div>
+        <div class="label">Total</div>
+    </div>
+</div>
+
+<!-- Bulk Actions -->
+<div class="bulk-actions">
+    <form method="POST" action="/dashboard/ubisoft/tokens/release-reserved" style="display: inline;" 
+          onsubmit="return confirm('🔓 Release ALL reserved tokens back to available?');">
+        <button type="submit" class="btn btn-secondary">🔓 Release Reserved</button>
+    </form>
+    <form method="POST" action="/dashboard/ubisoft/tokens/reset-all" style="display: inline;" 
+          onsubmit="return confirm('⚠️ Reset ALL tokens to available?');">
+        <input type="hidden" name="game" value="<%= typeof filters !== 'undefined' ? (filters.game || '') : (selectedGame || '') %>">
+        <input type="hidden" name="status" value="<%= typeof filters !== 'undefined' ? (filters.status || '') : '' %>">
+        <input type="hidden" name="account" value="<%= typeof filters !== 'undefined' ? (filters.account || '') : '' %>">
+        <button type="submit" class="btn btn-success">🔄 Reset All</button>
+    </form>
+    <% 
+    const hasFilters = (typeof filters !== 'undefined' && (filters.game || filters.status || filters.account)) || selectedGame;
+    if (hasFilters) { %>
+    <form method="POST" action="/dashboard/ubisoft/tokens/reset-filtered" style="display: inline;">
+        <input type="hidden" name="game" value="<%= typeof filters !== 'undefined' ? (filters.game || '') : (selectedGame || '') %>">
+        <input type="hidden" name="status" value="<%= typeof filters !== 'undefined' ? (filters.status || '') : '' %>">
+        <input type="hidden" name="account" value="<%= typeof filters !== 'undefined' ? (filters.account || '') : '' %>">
+        <button type="submit" class="btn btn-secondary" onclick="return confirm('Reset filtered tokens?');">
+            🔄 Reset Filtered
+        </button>
+    </form>
+    <% } %>
+</div>
+
+<!-- Filters -->
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Filter Tokens</span>
+    </div>
+    <form method="GET" action="/dashboard/ubisoft/tokens">
+        <div class="filters-row">
+            <div class="form-group">
+                <label class="form-label">Game</label>
+                <select name="game" class="form-control">
+                    <option value="">All Games</option>
+                    <% if (typeof games !== 'undefined') { games.forEach(g => { %>
+                    <option value="<%= g.id %>" <%= (typeof filters !== 'undefined' ? filters.game : selectedGame) == g.id ? 'selected' : '' %>><%= g.game_name %></option>
+                    <% }); } %>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Account</label>
+                <select name="account" class="form-control">
+                    <option value="">All Accounts</option>
+                    <% if (typeof accounts !== 'undefined') { accounts.forEach(a => { %>
+                    <option value="<%= a.id %>" <%= (typeof filters !== 'undefined' && filters.account == a.id) ? 'selected' : '' %>><%= a.account_name || 'Account ' + a.id %></option>
+                    <% }); } %>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-control">
+                    <option value="">All Status</option>
+                    <option value="available" <%= (typeof filters !== 'undefined' && filters.status === 'available') ? 'selected' : '' %>>Available</option>
+                    <option value="reserved" <%= (typeof filters !== 'undefined' && filters.status === 'reserved') ? 'selected' : '' %>>🔒 Reserved</option>
+                    <option value="used" <%= (typeof filters !== 'undefined' && filters.status === 'used') ? 'selected' : '' %>>Used</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-primary">🔍 Filter</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Tokens Table -->
+<div class="card">
+    <% if (tokens && tokens.length > 0) { %>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Game</th>
+                    <th>Account</th>
+                    <th>Status</th>
+                    <th>Last Used / Ticket</th>
+                    <th>Used By</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% tokens.forEach(t => { 
+                    const filterGame = typeof filters !== 'undefined' ? (filters.game || '') : (selectedGame || '');
+                    const filterStatus = typeof filters !== 'undefined' ? (filters.status || '') : '';
+                    const filterAccount = typeof filters !== 'undefined' ? (filters.account || '') : '';
+                    
+                    // Determine status
+                    const isReserved = !!t.reserved_by_ticket;
+                    const isUsed = !isReserved && t.last_used_at;
+                    const isAvailable = !isReserved && !isUsed;
+                    
+                    // Calculate regen countdown
+                    let regenCountdown = '';
+                    if (isUsed) {
+                        let regenTime = null;
+                        
+                        if (t.regenerates_at) {
+                            // regenerates_at is stored as ISO string with timezone
+                            regenTime = new Date(t.regenerates_at);
+                        } else if (t.last_used_at) {
+                            // Fallback: last_used_at from SQLite datetime('now') is UTC
+                            // Append 'Z' to treat it as UTC if it doesn't have timezone info
+                            let lastUsed = t.last_used_at;
+                            if (!lastUsed.includes('Z') && !lastUsed.includes('+')) {
+                                lastUsed = lastUsed.replace(' ', 'T') + 'Z';
+                            }
+                            regenTime = new Date(new Date(lastUsed).getTime() + 24 * 60 * 60 * 1000);
+                        }
+                        
+                        if (regenTime && !isNaN(regenTime.getTime())) {
+                            const now = new Date();
+                            const diff = regenTime.getTime() - now.getTime();
+                            if (diff > 0) {
+                                const hours = Math.floor(diff / (1000 * 60 * 60));
+                                const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                                regenCountdown = `⏳ ${hours}h ${mins}m`;
+                            } else {
+                                regenCountdown = '🔄 Ready to regen';
+                            }
+                        }
+                    }
+                %>
+                <tr>
+                    <td class="font-mono">#<%= t.id %></td>
+                    <td><%= t.game_name || '-' %></td>
+                    <td><%= t.account_name || 'Account ' + t.account_id || '-' %></td>
+                    <td>
+                        <% if (isReserved) { %>
+                        <span class="badge badge-reserved" title="Reserved by <%= t.reserved_by_ticket %>">🔒 reserved</span>
+                        <% } else if (isUsed) { %>
+                        <span class="badge badge-warning">used</span>
+                        <% } else { %>
+                        <span class="badge badge-success">available</span>
+                        <% } %>
+                    </td>
+                    <td>
+                        <% if (isReserved) { %>
+                        <span class="timer" style="color: #5865F2;">🎫 <%= t.reserved_by_ticket %></span>
+                        <% } else if (isUsed) { %>
+                        <span class="timer used">
+                            <%= formatDate(t.last_used_at) %>
+                            <% if (regenCountdown) { %>
+                            <br><small style="color: #f0ad4e;"><%= regenCountdown %></small>
+                            <% } %>
+                        </span>
+                        <% } else { %>
+                        <span class="timer ready">✅ Ready</span>
+                        <% } %>
+                    </td>
+                    <td><%= t.used_by_username || '-' %></td>
+                    <td>
+                        <% if (isUsed || isReserved) { %>
+                        <form method="POST" action="/dashboard/ubisoft/tokens/<%= t.id %>/reset" style="display: inline;">
+                            <input type="hidden" name="game" value="<%= filterGame %>">
+                            <input type="hidden" name="status" value="<%= filterStatus %>">
+                            <input type="hidden" name="account" value="<%= filterAccount %>">
+                            <button type="submit" class="btn btn-sm btn-success btn-reset" title="Reset to available">🔄</button>
+                        </form>
+                        <% } else { %>
+                        <form method="POST" action="/dashboard/ubisoft/tokens/<%= t.id %>/use" style="display: inline;">
+                            <input type="hidden" name="game" value="<%= filterGame %>">
+                            <input type="hidden" name="status" value="<%= filterStatus %>">
+                            <input type="hidden" name="account" value="<%= filterAccount %>">
+                            <button type="submit" class="btn btn-sm btn-warning btn-reset" title="Mark as used">⏱️</button>
+                        </form>
+                        <% } %>
+                        <form method="POST" action="/dashboard/ubisoft/tokens/<%= t.id %>/delete" style="display: inline; margin-left: 4px;">
+                            <input type="hidden" name="game" value="<%= filterGame %>">
+                            <input type="hidden" name="status" value="<%= filterStatus %>">
+                            <input type="hidden" name="account" value="<%= filterAccount %>">
+                            <button type="submit" class="btn btn-sm btn-danger btn-reset" title="Delete" onclick="return confirm('Delete this token?');">🗑️</button>
+                        </form>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+    
+    <% if (typeof pagination !== 'undefined' && pagination.totalPages > 1) { 
+        const filterGame = typeof filters !== 'undefined' ? (filters.game || '') : (selectedGame || '');
+        const filterStatus = typeof filters !== 'undefined' ? (filters.status || '') : '';
+        const filterAccount = typeof filters !== 'undefined' ? (filters.account || '') : '';
+    %>
+    <div class="pagination">
+        <% if (pagination.page > 1) { %>
+        <a href="?page=<%= pagination.page - 1 %>&game=<%= filterGame %>&status=<%= filterStatus %>&account=<%= filterAccount %>">← Prev</a>
+        <% } %>
+        <span class="active">Page <%= pagination.page %> of <%= pagination.totalPages %></span>
+        <% if (pagination.page < pagination.totalPages) { %>
+        <a href="?page=<%= pagination.page + 1 %>&game=<%= filterGame %>&status=<%= filterStatus %>&account=<%= filterAccount %>">Next →</a>
+        <% } %>
+    </div>
+    <% } %>
+    
+    <p style="text-align: center; margin-top: 16px; color: var(--text-muted);">
+        Showing <%= tokens.length %><%= typeof pagination !== 'undefined' && pagination.totalCount ? ' of ' + pagination.totalCount : '' %> tokens
+    </p>
+    <% } else { %>
+    <div class="empty-state">
+        <div class="icon">🎟️</div>
+        <p>No tokens found.</p>
+        <a href="/dashboard/ubisoft/tokens/add" class="btn btn-primary" style="margin-top: 1rem;">➕ Add Tokens</a>
+    </div>
+    <% } %>
+</div>
+
+<%- include('../partials/footer') %>

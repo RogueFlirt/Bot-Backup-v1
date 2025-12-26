@@ -1,0 +1,137 @@
+<%- include('../partials/header') %>
+
+<style>
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    border-radius: 8px;
+    color: white;
+    z-index: 9999;
+    animation: slideIn 0.3s ease;
+}
+.toast.success { background: #57F287; color: #000; }
+.toast.error { background: #ED4245; }
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+.quantity-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.quantity-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 4px;
+    background: #5865F2;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+}
+.quantity-btn:hover { background: #4752C4; }
+.quantity-input {
+    width: 80px;
+    text-align: center;
+}
+</style>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">➕</span>
+        Add EA Tokens
+    </h1>
+    <div class="page-actions">
+        <a href="/dashboard/ea/tokens" class="btn btn-secondary">← Back to Tokens</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">Add Tokens</span>
+    </div>
+    <div style="padding: 20px;">
+        <form id="addTokensForm">
+            <div class="form-group">
+                <label class="form-label">Game</label>
+                <select name="game" id="gameSelect" class="form-control" required>
+                    <option value="">Select a game...</option>
+                    <% if (typeof games !== 'undefined') { games.forEach(g => { %>
+                    <option value="<%= g.id %>"><%= g.game_name %></option>
+                    <% }); } %>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Account</label>
+                <select name="account" id="accountSelect" class="form-control" required>
+                    <option value="">Select an account...</option>
+                    <% if (typeof accounts !== 'undefined') { accounts.forEach(a => { %>
+                    <option value="<%= a.id %>"><%= a.account_name %></option>
+                    <% }); } %>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Quantity</label>
+                <div class="quantity-controls">
+                    <button type="button" class="quantity-btn" onclick="changeQty(-1)">-</button>
+                    <input type="number" name="quantity" id="quantityInput" class="form-control quantity-input" value="1" min="1" max="100">
+                    <button type="button" class="quantity-btn" onclick="changeQty(1)">+</button>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-success" id="addBtn">➕ Add Tokens</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function changeQty(delta) {
+    const input = document.getElementById('quantityInput');
+    const newVal = Math.max(1, Math.min(100, parseInt(input.value) + delta));
+    input.value = newVal;
+}
+
+function showToast(msg, type) {
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + type;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+document.getElementById('addTokensForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('addBtn');
+    btn.classList.add('loading');
+    btn.textContent = '⏳ Adding...';
+    
+    try {
+        const formData = new FormData(this);
+        const response = await fetch('/dashboard/ea/tokens/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                game: formData.get('game'),
+                account: formData.get('account'),
+                quantity: parseInt(formData.get('quantity'))
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showToast('✅ Added ' + result.count + ' tokens!', 'success');
+        } else {
+            showToast('❌ ' + (result.error || 'Failed to add tokens'), 'error');
+        }
+    } catch (err) {
+        showToast('❌ Error: ' + err.message, 'error');
+    }
+    
+    btn.classList.remove('loading');
+    btn.textContent = '➕ Add Tokens';
+});
+</script>
+
+<%- include('../partials/footer') %>

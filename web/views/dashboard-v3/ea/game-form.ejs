@@ -1,0 +1,85 @@
+<%- include('../partials/header') %>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon"><%= game ? '✏️' : '➕' %></span>
+        <%= game ? 'Edit' : 'Add' %> EA Game
+    </h1>
+    <div class="page-actions">
+        <a href="/dashboard/ea/games" class="btn btn-secondary">← Back</a>
+    </div>
+</div>
+
+<div class="card">
+    <form method="POST" action="/dashboard/ea/games<%= game ? '/' + game.id + '/edit' : '/add' %>">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Game Name *</label>
+                <input type="text" name="game_name" class="form-control" value="<%= game?.game_name || '' %>" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Content ID</label>
+                <input type="text" name="app_id" class="form-control" value="<%= game?.content_id || game?.app_id || '' %>" placeholder="EA Content ID">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Folder Name</label>
+                <input type="text" name="folder_name" class="form-control" value="<%= game?.folder_name || '' %>" placeholder="Expected folder name">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Size (GB)</label>
+                <input type="number" name="size_gb" class="form-control" value="<%= game?.size_gb || '' %>" step="0.1" placeholder="e.g. 50.5">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Panel Type</label>
+                <select name="panel_type" class="form-control">
+                    <option value="free" <%= game?.panel_type === 'free' ? 'selected' : '' %>>Free</option>
+                    <option value="paid" <%= game?.panel_type === 'paid' ? 'selected' : '' %>>Paid</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Demand Type</label>
+                <select name="demand_type" class="form-control">
+                    <option value="normal" <%= game?.demand_type === 'normal' || !game?.demand_type ? 'selected' : '' %>>Normal</option>
+                    <option value="high" <%= game?.demand_type === 'high' ? 'selected' : '' %>>High Demand</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Cover Image URL</label>
+            <input type="url" name="cover_url" class="form-control" value="<%= game?.cover_url || '' %>" placeholder="https://...">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Download Links</label>
+            <textarea name="download_links" class="form-control" rows="4" placeholder="One link per line"><%= game?.download_links || '' %></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Instructions</label>
+            <textarea name="instructions" class="form-control" rows="6" placeholder="Installation instructions..."><%= game?.instructions || '' %></textarea>
+        </div>
+        
+        <% if (game) { %>
+        <div class="form-group">
+            <label class="form-label">
+                <input type="checkbox" name="enabled" <%= game?.enabled ? 'checked' : '' %>>
+                Enabled
+            </label>
+        </div>
+        <% } %>
+        
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><%= game ? '💾 Save Changes' : '➕ Add Game' %></button>
+            <a href="/dashboard/ea/games" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<%- include('../partials/footer') %>

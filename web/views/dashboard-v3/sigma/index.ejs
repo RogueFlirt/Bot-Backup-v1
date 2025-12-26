@@ -1,0 +1,536 @@
+<%- include('../partials/header') %>
+
+<style>
+    .sigma-grid { display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; min-height: 600px; }
+    .folder-tree { max-height: 500px; overflow-y: auto; }
+    .folder-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 6px; cursor: pointer; margin-bottom: 4px; border: 1px solid transparent; }
+    .folder-item:hover { background: rgba(233, 69, 96, 0.1); }
+    .folder-item.active { background: rgba(233, 69, 96, 0.2); border-color: var(--primary); }
+    .folder-item .icon { font-size: 1.2rem; }
+    .folder-item .name { flex: 1; font-weight: 500; }
+    .folder-item .count { font-size: 0.75rem; color: var(--text-muted); background: var(--bg); padding: 2px 8px; border-radius: 10px; }
+    .folder-item .delete-btn { opacity: 0; color: var(--danger); cursor: pointer; padding: 4px; }
+    .folder-item:hover .delete-btn { opacity: 1; }
+    
+    .file-list { margin-top: 1rem; }
+    .file-item { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--card-bg); border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--border); }
+    .file-item:hover { border-color: var(--primary); }
+    .file-item .file-icon { font-size: 1.5rem; }
+    .file-item .file-info { flex: 1; }
+    .file-item .file-name { font-weight: 500; }
+    .file-item .file-meta { font-size: 0.8rem; color: var(--text-muted); }
+    .file-item .file-actions { display: flex; gap: 4px; }
+    
+    .upload-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 1rem; }
+    .upload-zone:hover, .upload-zone.dragover { border-color: var(--primary); background: rgba(233, 69, 96, 0.05); }
+    .upload-zone input { display: none; }
+    .upload-zone.mini { padding: 1rem; }
+    
+    .toast { position: fixed; top: 20px; right: 20px; padding: 16px 24px; border-radius: 8px; color: white; z-index: 1000; animation: slideIn 0.3s ease; }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--danger); }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    
+    .new-folder-form { display: flex; gap: 8px; margin-top: 1rem; }
+    .api-info { background: #1a1a2e; border-radius: 8px; padding: 1rem; font-size: 0.85rem; }
+    .api-info code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; }
+    .api-info p { margin: 6px 0; }
+    
+    .depot-item { background: #1a1a2e; border-radius: 6px; padding: 12px; margin-bottom: 8px; }
+    .depot-item .depot-id { font-weight: bold; color: var(--primary); }
+    .depot-item .key { font-family: monospace; font-size: 0.8rem; word-break: break-all; margin-top: 4px; color: var(--text-muted); }
+    
+    .lua-upload-section { background: linear-gradient(135deg, #1a1a2e 0%, #2d1f3d 100%); border: 1px solid #5865F2; }
+    
+    @media (max-width: 900px) { .sigma-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="page-header">
+    <h1 class="page-title">
+        <span class="icon">📦</span>
+        Sigma File Manager
+    </h1>
+</div>
+
+<!-- Mass Lua Upload Section -->
+<div class="card lua-upload-section" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <span class="card-title">🚀 Mass Lua Upload</span>
+    </div>
+    <div style="padding: 15px;">
+        <div class="form-row" style="margin-bottom: 15px;">
+            <div class="form-group" style="flex: 0 0 200px;">
+                <label class="form-label">Destination Folder</label>
+                <select id="luaDestFolder" class="form-control">
+                    <option value="sigmastaff">sigmastaff</option>
+                    <option value="sigmaui">sigmaui</option>
+                </select>
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label class="form-label">Select .lua Files <span id="fileCountLabel" style="color: #888;"></span></label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <input type="file" id="luaFiles" accept=".lua" multiple class="form-control" style="flex: 1; min-width: 200px;" onchange="updateFileCount()">
+                    <button class="btn btn-secondary" onclick="selectFolder()">📁 Select Folder</button>
+                    <button class="btn btn-primary" onclick="uploadLuaFiles()">📤 Upload All</button>
+                </div>
+                <input type="file" id="luaFolderInput" webkitdirectory multiple style="display: none;" onchange="handleFolderSelect(this)">
+            </div>
+        </div>
+        <div id="luaUploadStatus" style="display: none; padding: 10px; border-radius: 6px; margin-top: 10px;"></div>
+        <div style="color: #888; font-size: 0.85rem;">
+            <strong>API:</strong> <code>POST /api/sigmastaff/upload</code> or <code>POST /api/sigmaui/upload</code> with <code>files[]</code> (up to 100k files)
+        </div>
+    </div>
+</div>
+
+<div class="sigma-grid">
+    <!-- Folder Browser -->
+    <div>
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">📁 Folders</span>
+            </div>
+            <div class="folder-tree" id="folderTree">
+                <% if (appids && appids.length > 0) { %>
+                    <% appids.forEach(appid => { %>
+                    <div class="folder-item" onclick="loadFolder('<%= appid.id %>')" data-appid="<%= appid.id %>">
+                        <span class="icon">📂</span>
+                        <span class="name"><%= appid.id %></span>
+                        <span class="count"><%= appid.files %></span>
+                        <span class="delete-btn" onclick="event.stopPropagation(); deleteFolder('<%= appid.id %>')">🗑️</span>
+                    </div>
+                    <% }); %>
+                <% } else { %>
+                    <p style="color: var(--text-muted); text-align: center; padding: 2rem;">No folders yet</p>
+                <% } %>
+            </div>
+            
+            <div class="new-folder-form">
+                <input type="text" id="newFolderName" class="form-control" placeholder="Folder name..." style="flex: 1;">
+                <button class="btn btn-secondary" onclick="createFolder()">➕</button>
+            </div>
+        </div>
+        
+        <!-- API Info -->
+        <div class="card" style="margin-top: 1rem;">
+            <div class="card-header">
+                <span class="card-title">🔗 API Endpoints</span>
+            </div>
+            <div class="api-info">
+                <p><strong>Sigma Staff:</strong></p>
+                <p><code>GET /api/sigmastaff</code></p>
+                <p style="color: var(--text-muted);">→ List files (IDs only)</p>
+                <p><code>GET /api/sigmastaff/:id</code></p>
+                <p style="color: var(--text-muted);">→ Download file</p>
+                <p><code>POST /api/sigmastaff/upload</code></p>
+                <p style="color: var(--text-muted);">→ Upload .lua files</p>
+                <hr style="border-color: #333; margin: 10px 0;">
+                <p><strong>Sigma UI:</strong></p>
+                <p><code>GET /api/sigmaui</code></p>
+                <p style="color: var(--text-muted);">→ List files (IDs only)</p>
+                <p><code>GET /api/sigmaui/:id</code></p>
+                <p style="color: var(--text-muted);">→ Download file</p>
+                <p><code>POST /api/sigmaui/upload</code></p>
+                <p style="color: var(--text-muted);">→ Upload .lua files</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div>
+        <!-- No folder selected -->
+        <div class="card" id="noFolderSelected">
+            <div class="empty-state" style="padding: 3rem;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">📁</div>
+                <h3>Select a folder</h3>
+                <p style="color: var(--text-muted);">Choose a folder from the left or create a new one</p>
+            </div>
+        </div>
+        
+        <!-- Folder Content -->
+        <div id="folderContent" style="display: none;">
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span class="card-title">📂 <span id="currentFolderName"></span></span>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-sm btn-primary" onclick="document.getElementById('uploadFile').click()">📤 Upload File</button>
+                        <button class="btn btn-sm btn-secondary" onclick="showVdfParser()">📄 Parse VDF</button>
+                    </div>
+                </div>
+                
+                <!-- Upload Zone -->
+                <div class="upload-zone mini" id="uploadZone" onclick="document.getElementById('uploadFile').click()">
+                    <input type="file" id="uploadFile" onchange="handleFileUpload(this)" multiple>
+                    Drop files here or click to upload
+                </div>
+                
+                <!-- File List -->
+                <div class="file-list" id="fileList">
+                    <p style="color: var(--text-muted); text-align: center;">No files</p>
+                </div>
+            </div>
+            
+            <!-- VDF Parser -->
+            <div class="card" id="vdfParserCard" style="display: none; margin-top: 1rem;">
+                <div class="card-header">
+                    <span class="card-title">📄 VDF Parser</span>
+                </div>
+                <div class="upload-zone" id="vdfUploadZone" onclick="document.getElementById('vdfFile').click()">
+                    <input type="file" id="vdfFile" accept=".vdf,.txt" onchange="handleVdfUpload(this)">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📄</div>
+                    <p>Drop config.vdf here</p>
+                </div>
+                <div id="parsedDepots" style="display: none; margin-top: 1rem;"></div>
+                
+                <!-- AppID Input -->
+                <div id="appidInputSection" style="display: none; margin-top: 1rem; padding: 15px; background: #1a1a2e; border-radius: 8px;">
+                    <label class="form-label" style="color: #5865F2; font-weight: bold;">⚠️ Save Config:</label>
+                    <div style="display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
+                        <select id="vdfDestFolder" class="form-control" style="width: 150px;">
+                            <option value="sigmaui">sigmaui</option>
+                            <option value="sigmastaff">sigmastaff</option>
+                        </select>
+                        <input type="text" id="vdfAppId" class="form-control" placeholder="AppID (e.g., 123456)" style="flex: 1; min-width: 150px; max-width: 200px;">
+                        <button class="btn btn-primary" onclick="saveVdfConfig()">💾 Save</button>
+                    </div>
+                    <small style="color: #888; margin-top: 5px; display: block;">Saves as: <span id="savePathPreview">sigmaui/{appid}.json</span></small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentFolder = null;
+    let parsedDepots = [];
+    
+    // Mass Lua Upload
+    async function uploadLuaFiles() {
+        const folder = document.getElementById('luaDestFolder').value;
+        const fileInput = document.getElementById('luaFiles');
+        const statusDiv = document.getElementById('luaUploadStatus');
+        
+        if (!fileInput.files || fileInput.files.length === 0) {
+            showToast('Select at least one .lua file', 'error');
+            return;
+        }
+        
+        const fileCount = fileInput.files.length;
+        statusDiv.style.display = 'block';
+        statusDiv.style.background = '#1a1a2e';
+        statusDiv.innerHTML = '⏳ Uploading ' + fileCount + ' files to ' + folder + '...';
+        
+        const formData = new FormData();
+        for (const file of fileInput.files) {
+            formData.append('files', file);
+        }
+        
+        try {
+            // Use the specific endpoint for each folder
+            const endpoint = '/api/' + folder + '/upload';
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                body: formData
+            });
+            
+            // Handle non-JSON responses
+            const contentType = res.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await res.text();
+                throw new Error('Server returned non-JSON response: ' + text.substring(0, 100));
+            }
+            
+            const data = await res.json();
+            
+            if (data.success) {
+                statusDiv.style.background = 'rgba(35, 165, 89, 0.2)';
+                statusDiv.innerHTML = '✅ Uploaded ' + data.count + ' files to <strong>' + folder + '</strong>';
+                fileInput.value = '';
+                document.getElementById('fileCountLabel').textContent = '';
+                showToast('Uploaded ' + data.count + ' files!', 'success');
+            } else {
+                statusDiv.style.background = 'rgba(239, 68, 68, 0.2)';
+                statusDiv.innerHTML = '❌ ' + (data.error || 'Upload failed');
+                showToast(data.error || 'Upload failed', 'error');
+            }
+        } catch (err) {
+            statusDiv.style.background = 'rgba(239, 68, 68, 0.2)';
+            statusDiv.innerHTML = '❌ Error: ' + err.message;
+            showToast('Upload error: ' + err.message, 'error');
+        }
+    }
+    
+    function selectFolder() {
+        document.getElementById('luaFolderInput').click();
+    }
+    
+    function handleFolderSelect(input) {
+        if (input.files && input.files.length > 0) {
+            // Filter only .lua files
+            const luaFiles = Array.from(input.files).filter(f => f.name.endsWith('.lua'));
+            
+            // Create a new DataTransfer to set filtered files
+            const dt = new DataTransfer();
+            luaFiles.forEach(f => dt.items.add(f));
+            
+            document.getElementById('luaFiles').files = dt.files;
+            updateFileCount();
+            showToast('Selected ' + luaFiles.length + ' .lua files from folder', 'success');
+        }
+    }
+    
+    function updateFileCount() {
+        const fileInput = document.getElementById('luaFiles');
+        const label = document.getElementById('fileCountLabel');
+        if (fileInput.files && fileInput.files.length > 0) {
+            label.textContent = '(' + fileInput.files.length + ' files selected)';
+        } else {
+            label.textContent = '';
+        }
+    }
+    
+    // Drag and drop
+    document.getElementById('uploadZone').addEventListener('dragover', (e) => { e.preventDefault(); e.target.classList.add('dragover'); });
+    document.getElementById('uploadZone').addEventListener('dragleave', (e) => e.target.classList.remove('dragover'));
+    document.getElementById('uploadZone').addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.target.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) uploadFiles(e.dataTransfer.files);
+    });
+    
+    document.getElementById('vdfUploadZone').addEventListener('dragover', (e) => { e.preventDefault(); e.target.classList.add('dragover'); });
+    document.getElementById('vdfUploadZone').addEventListener('dragleave', (e) => e.target.classList.remove('dragover'));
+    document.getElementById('vdfUploadZone').addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.target.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) parseVdfFile(e.dataTransfer.files[0]);
+    });
+    
+    function loadFolder(folder) {
+        currentFolder = folder;
+        document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
+        document.querySelector(`[data-appid="${folder}"]`)?.classList.add('active');
+        document.getElementById('noFolderSelected').style.display = 'none';
+        document.getElementById('folderContent').style.display = 'block';
+        document.getElementById('currentFolderName').textContent = folder;
+        document.getElementById('vdfParserCard').style.display = 'none';
+        
+        fetch(`/api/sigma/${folder}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.files) renderFileList(data.files);
+                else document.getElementById('fileList').innerHTML = '<p style="color: var(--text-muted); text-align: center;">No files</p>';
+            });
+    }
+    
+    function renderFileList(files) {
+        const container = document.getElementById('fileList');
+        if (!files || files.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-muted); text-align: center;">No files</p>';
+            return;
+        }
+        
+        container.innerHTML = files.map(f => `
+            <div class="file-item">
+                <span class="file-icon">${getFileIcon(f.name)}</span>
+                <div class="file-info">
+                    <div class="file-name">${f.name}</div>
+                    <div class="file-meta">${formatSize(f.size)} • ${new Date(f.modified).toLocaleString()}</div>
+                </div>
+                <div class="file-actions">
+                    <a href="/api/sigma/${currentFolder}/${f.name}?download=1" class="btn btn-sm btn-secondary">⬇️</a>
+                    <button class="btn btn-sm btn-danger" onclick="deleteFile('${f.name}')">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    function getFileIcon(name) {
+        if (name.endsWith('.json')) return '📋';
+        if (name.endsWith('.lua')) return '📜';
+        if (name.endsWith('.vdf')) return '📄';
+        return '📁';
+    }
+    
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+    
+    function handleFileUpload(input) {
+        if (input.files.length > 0) uploadFiles(input.files);
+    }
+    
+    async function uploadFiles(files) {
+        if (!currentFolder) { showToast('Select a folder first', 'error'); return; }
+        
+        for (const file of files) {
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const res = await fetch(`/api/sigma/${currentFolder}/upload`, { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.success) showToast(`✅ Uploaded ${file.name}`, 'success');
+                else showToast(data.error || 'Upload failed', 'error');
+            } catch (err) {
+                showToast('Upload error: ' + err.message, 'error');
+            }
+        }
+        
+        loadFolder(currentFolder);
+        document.getElementById('uploadFile').value = '';
+    }
+    
+    function deleteFile(filename) {
+        if (!confirm(`Delete ${filename}?`)) return;
+        fetch(`/api/sigma/${currentFolder}/${filename}`, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) { showToast('🗑️ Deleted', 'success'); loadFolder(currentFolder); }
+                else showToast(data.error || 'Delete failed', 'error');
+            });
+    }
+    
+    function createFolder() {
+        const name = document.getElementById('newFolderName').value.trim();
+        if (!name) { showToast('Enter folder name', 'error'); return; }
+        
+        fetch('/api/sigma/create-folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ appid: name })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) { showToast('📁 Folder created', 'success'); setTimeout(() => location.reload(), 500); }
+            else showToast(data.error || 'Failed', 'error');
+        });
+    }
+    
+    function deleteFolder(folder) {
+        if (!confirm(`Delete folder "${folder}" and ALL its contents?`)) return;
+        fetch(`/api/sigma/${folder}`, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) { showToast('🗑️ Folder deleted', 'success'); setTimeout(() => location.reload(), 500); }
+                else showToast(data.error || 'Failed', 'error');
+            });
+    }
+    
+    // VDF Parser
+    function showVdfParser() {
+        document.getElementById('vdfParserCard').style.display = 'block';
+        document.getElementById('appidInputSection').style.display = 'none';
+        document.getElementById('parsedDepots').style.display = 'none';
+    }
+    
+    function handleVdfUpload(input) {
+        if (input.files[0]) parseVdfFile(input.files[0]);
+    }
+    
+    function parseVdfFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            parsedDepots = parseVdf(e.target.result);
+            displayParsedDepots();
+        };
+        reader.readAsText(file);
+    }
+    
+    function parseVdf(content) {
+        const depots = [];
+        const lines = content.split('\n');
+        let currentDepotId = null;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            const depotMatch = line.match(/^"(\d+)"$/);
+            if (depotMatch) { currentDepotId = depotMatch[1]; continue; }
+            const keyMatch = line.match(/^"[Dd]ecryption[Kk]ey"\s+"([A-Fa-f0-9]+)"$/);
+            if (keyMatch && currentDepotId) {
+                depots.push({ depotid: currentDepotId, decryption_key: keyMatch[1] });
+                currentDepotId = null;
+            }
+        }
+        return depots;
+    }
+    
+    function displayParsedDepots() {
+        const container = document.getElementById('parsedDepots');
+        const appidSection = document.getElementById('appidInputSection');
+        
+        if (parsedDepots.length === 0) {
+            container.innerHTML = '<p style="color: var(--warning);">⚠️ No depots found</p>';
+            container.style.display = 'block';
+            appidSection.style.display = 'none';
+            return;
+        }
+        
+        container.innerHTML = '<h4 style="margin-bottom: 0.5rem;">Found ' + parsedDepots.length + ' depot(s):</h4>' +
+            parsedDepots.map(d => `
+                <div class="depot-item">
+                    <div class="depot-id">Depot: ${d.depotid}</div>
+                    <div class="key">${d.decryption_key}</div>
+                </div>
+            `).join('');
+        container.style.display = 'block';
+        appidSection.style.display = 'block';
+        document.getElementById('vdfAppId').value = '';
+        document.getElementById('vdfAppId').focus();
+        
+        // Set up event listeners for path preview
+        document.getElementById('vdfDestFolder').onchange = updatePathPreview;
+        document.getElementById('vdfAppId').oninput = updatePathPreview;
+        updatePathPreview();
+    }
+    
+    function saveVdfConfig() {
+        const appid = document.getElementById('vdfAppId').value.trim();
+        const destFolder = document.getElementById('vdfDestFolder').value;
+        
+        if (!appid) { showToast('Enter an AppID', 'error'); return; }
+        if (parsedDepots.length === 0) { showToast('No data to save', 'error'); return; }
+        
+        fetch('/api/sigma/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                appid: appid, 
+                depots: parsedDepots,
+                targetFolder: destFolder
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast('✅ Saved ' + appid + '.json to ' + destFolder, 'success');
+                document.getElementById('vdfParserCard').style.display = 'none';
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast(data.error || 'Save failed', 'error');
+            }
+        });
+    }
+    
+    // Update path preview when dropdown or appid changes
+    function updatePathPreview() {
+        const folder = document.getElementById('vdfDestFolder')?.value || 'sigmaui';
+        const appid = document.getElementById('vdfAppId')?.value.trim() || '{appid}';
+        const preview = document.getElementById('savePathPreview');
+        if (preview) preview.textContent = folder + '/' + appid + '.json';
+    }
+    
+    function showToast(message, type = 'success') {
+        const existing = document.querySelector('.toast');
+        if (existing) existing.remove();
+        const toast = document.createElement('div');
+        toast.className = 'toast ' + type;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+</script>
+
+<%- include('../partials/footer') %>
